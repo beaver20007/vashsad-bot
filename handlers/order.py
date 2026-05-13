@@ -14,6 +14,7 @@ from keyboards import (
     services_keyboard, order_confirm_keyboard,
     back_to_menu_keyboard, cancel_keyboard
 )
+from services.email_service import notify_email_new_order, notify_email_new_project
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -172,8 +173,7 @@ async def contact_phone(message: Message, state: FSMContext):
         pass
 
     await message.answer(
-        f"✅ Телефон: <code>{phone}</code>\n\n"
-        f"{EMAIL_PROMPT}",
+        f"✅ Телефон: <code>{phone}</code>\n\n{EMAIL_PROMPT}",
         parse_mode="HTML",
         reply_markup=skip_inline_keyboard(),
     )
@@ -205,6 +205,7 @@ async def _finish_contact(message, state, email, user, edit=False):
     price_str = f"{svc_price:,} ₽".replace(",", " ")
     phone     = data.get("phone", "не указан")
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
+    dt        = message.date.strftime("%d.%m.%Y %H:%M")
 
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА — ВашСад Бот</b>\n\n"
@@ -213,9 +214,14 @@ async def _finish_contact(message, state, email, user, edit=False):
         f"💰 Сумма: {price_str}\n"
         f"📱 Телефон: {phone}\n"
         f"📧 Email: {email}\n\n"
-        f"⏰ {message.date.strftime('%d.%m.%Y %H:%M')}"
+        f"⏰ {dt}"
     )
-    await notify_all(message.bot, designer_msg)
+    # Telegram + Email параллельно
+    import asyncio
+    await asyncio.gather(
+        notify_all(message.bot, designer_msg),
+        notify_email_new_order(user_info, svc_name, price_str, phone, email, dt),
+    )
 
     result_text = (
         f"✅ <b>Заявка принята!</b>\n\n"
@@ -322,8 +328,7 @@ async def brief_wishes(message: Message, state: FSMContext):
         pass
 
     await message.answer(
-        f"📱 <b>Контакты 1/2 — Телефон</b>\n\n"
-        f"{PHONE_PROMPT}",
+        f"📱 <b>Контакты 1/2 — Телефон</b>\n\n{PHONE_PROMPT}",
         parse_mode="HTML",
         reply_markup=cancel_keyboard(),
     )
@@ -341,8 +346,7 @@ async def brief_phone(message: Message, state: FSMContext):
 
     await message.answer(
         f"✅ Телефон: <code>{phone}</code>\n\n"
-        f"📧 <b>Контакты 2/2 — Email</b>\n\n"
-        f"{EMAIL_PROMPT}",
+        f"📧 <b>Контакты 2/2 — Email</b>\n\n{EMAIL_PROMPT}",
         parse_mode="HTML",
         reply_markup=skip_inline_keyboard(),
     )
@@ -370,7 +374,8 @@ async def _finish_brief(message, state, email, user, edit=False):
     await state.clear()
 
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
-    phone = data.get("phone", "не указан")
+    phone     = data.get("phone", "не указан")
+    dt        = message.date.strftime("%d.%m.%Y %H:%M")
 
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА НА ПРОЕКТ — ВашСад Бот</b>\n\n"
@@ -381,9 +386,17 @@ async def _finish_brief(message, state, email, user, edit=False):
         f"💬 Пожелания: {data.get('wishes', '?')}\n"
         f"📱 Телефон: {phone}\n"
         f"📧 Email: {email}\n\n"
-        f"⏰ {message.date.strftime('%d.%m.%Y %H:%M')}"
+        f"⏰ {dt}"
     )
-    await notify_all(message.bot, designer_msg)
+
+    import asyncio
+    await asyncio.gather(
+        notify_all(message.bot, designer_msg),
+        notify_email_new_project(
+            user_info, data.get("area", "?"), data.get("existing", "?"),
+            data.get("style", "?"), data.get("wishes", "?"), phone, email, dt
+        ),
+    )
 
     result_text = (
         f"✅ <b>Бриф отправлен!</b>\n\n"
