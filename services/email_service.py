@@ -1,59 +1,63 @@
-"""Email уведомления через Gmail — ВашСад Бот"""
-import aiosmtplib
+"""Email уведомления через Resend API — ВашСад Бот"""
+import aiohttp
 import logging
 import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 log = logging.getLogger(__name__)
 
-EMAIL_LOGIN    = os.getenv("EMAIL_LOGIN", "")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
-EMAIL_TO       = os.getenv("EMAIL_TO", EMAIL_LOGIN)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+EMAIL_TO       = os.getenv("EMAIL_TO", "")
+EMAIL_FROM     = "VashSad Bot <onboarding@resend.dev>"  # бесплатный домен Resend
 
 
 async def send_email(subject: str, body: str) -> bool:
-    """Отправить email. Порт 465 SSL — обходит блокировку Railway."""
-    if not EMAIL_LOGIN or not EMAIL_PASSWORD:
+    """Отправить email через Resend HTTP API."""
+    if not RESEND_API_KEY or not EMAIL_TO:
         log.warning("Email не настроен — пропускаем")
         return False
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = EMAIL_LOGIN
-        msg["To"]      = EMAIL_TO
-
-        html = f"""
-        <html><body style="font-family: Arial, sans-serif; padding: 20px;">
-        <div style="max-width: 600px; margin: 0 auto;">
-            <div style="background: #2D6A4F; padding: 16px; border-radius: 8px 8px 0 0;">
-                <h2 style="color: white; margin: 0;">🌿 ВашСад Бот</h2>
-            </div>
-            <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; white-space: pre-line;">
-                {body}
-            </div>
+    html = f"""
+    <html><body style="font-family: Arial, sans-serif; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto;">
+        <div style="background: #2D6A4F; padding: 16px; border-radius: 8px 8px 0 0;">
+            <h2 style="color: white; margin: 0;">🌿 ВашСад Бот</h2>
         </div>
-        </body></html>
-        """
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; white-space: pre-line;">
+            {body}
+        </div>
+    </div>
+    </body></html>
+    """
 
-        # Порт 465 с SSL вместо 587 STARTTLS
-        await aiosmtplib.send(
-            msg,
-            hostname="smtp.gmail.com",
-            port=465,
-            use_tls=True,
-            username=EMAIL_LOGIN,
-            password=EMAIL_PASSWORD,
-            timeout=15,
-        )
-        log.info(f"Email отправлен на {EMAIL_TO}")
-        return True
+    payload = {
+        "from":    EMAIL_FROM,
+        "to":      [EMAIL_TO],
+        "subject": subject,
+        "html":    html,
+        "text":    body,
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type":  "application/json",
+                },
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                data = await resp.json()
+                if resp.status == 200 or resp.status == 201:
+                    log.info(f"Email отправлен, id={data.get('id')}")
+                    return True
+                else:
+                    log.error(f"Resend ошибка {resp.status}: {data}")
+                    return False
 
     except Exception as e:
-        log.error(f"Ошибка отправки email: {e}")
+        log.error(f"Email exception: {e}")
         return False
 
 
