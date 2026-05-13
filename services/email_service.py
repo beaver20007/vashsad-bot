@@ -1,4 +1,4 @@
-"""Email уведомления — ВашСад Бот"""
+"""Email уведомления через Gmail — ВашСад Бот"""
 import aiosmtplib
 import logging
 import os
@@ -7,15 +7,15 @@ from email.mime.multipart import MIMEMultipart
 
 log = logging.getLogger(__name__)
 
-EMAIL_LOGIN   = os.getenv("EMAIL_LOGIN", "")
+EMAIL_LOGIN    = os.getenv("EMAIL_LOGIN", "")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
-EMAIL_TO      = os.getenv("EMAIL_TO", EMAIL_LOGIN)  # куда слать, по умолчанию на себя
+EMAIL_TO       = os.getenv("EMAIL_TO", EMAIL_LOGIN)
 
 
 async def send_email(subject: str, body: str) -> bool:
-    """Отправить email уведомление. Возвращает True если успешно."""
+    """Отправить email. Порт 465 SSL — обходит блокировку Railway."""
     if not EMAIL_LOGIN or not EMAIL_PASSWORD:
-        log.warning("Email не настроен — пропускаем отправку")
+        log.warning("Email не настроен — пропускаем")
         return False
 
     try:
@@ -24,7 +24,6 @@ async def send_email(subject: str, body: str) -> bool:
         msg["From"]    = EMAIL_LOGIN
         msg["To"]      = EMAIL_TO
 
-        # HTML версия письма
         html = f"""
         <html><body style="font-family: Arial, sans-serif; padding: 20px;">
         <div style="max-width: 600px; margin: 0 auto;">
@@ -37,17 +36,18 @@ async def send_email(subject: str, body: str) -> bool:
         </div>
         </body></html>
         """
-
         msg.attach(MIMEText(body, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
 
+        # Порт 465 с SSL вместо 587 STARTTLS
         await aiosmtplib.send(
             msg,
             hostname="smtp.gmail.com",
-            port=587,
-            start_tls=True,
+            port=465,
+            use_tls=True,
             username=EMAIL_LOGIN,
             password=EMAIL_PASSWORD,
+            timeout=15,
         )
         log.info(f"Email отправлен на {EMAIL_TO}")
         return True
@@ -59,7 +59,6 @@ async def send_email(subject: str, body: str) -> bool:
 
 async def notify_email_new_order(user_info: str, service_name: str,
                                   price_str: str, phone: str, email: str, dt: str):
-    """Уведомление о новой заявке на услугу."""
     subject = f"🌿 Новая заявка — {service_name}"
     body = (
         f"НОВАЯ ЗАЯВКА — ВашСад Бот\n\n"
@@ -76,7 +75,6 @@ async def notify_email_new_order(user_info: str, service_name: str,
 async def notify_email_new_project(user_info: str, area: str, existing: str,
                                     style: str, wishes: str, phone: str,
                                     email: str, dt: str):
-    """Уведомление о новом брифе на проект."""
     subject = "🏡 Новый бриф на проект — ВашСад Бот"
     body = (
         f"НОВАЯ ЗАЯВКА НА ПРОЕКТ — ВашСад Бот\n\n"

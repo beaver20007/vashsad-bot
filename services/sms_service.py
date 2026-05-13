@@ -11,7 +11,7 @@ SMS_PHONE    = os.getenv("SMS_PHONE", "")
 
 
 async def send_sms(text: str) -> bool:
-    """Отправить SMS на номер дизайнера. Возвращает True если успешно."""
+    """Отправить SMS на номер дизайнера."""
     if not SMS_LOGIN or not SMS_PASSWORD or not SMS_PHONE:
         log.warning("SMS не настроен — пропускаем")
         return False
@@ -21,20 +21,22 @@ async def send_sms(text: str) -> bool:
             async with session.get(
                 "https://smsc.ru/sys/send.php",
                 params={
-                    "login":  SMS_LOGIN,
-                    "psw":    SMS_PASSWORD,
-                    "phones": SMS_PHONE,
-                    "mes":    text,
-                    "fmt":    1,   # ответ в JSON
+                    "login":   SMS_LOGIN,
+                    "psw":     SMS_PASSWORD,
+                    "phones":  SMS_PHONE,
+                    "mes":     text,
                     "charset": "utf-8",
+                    # fmt=1 убрали — берём текстовый ответ
                 },
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as resp:
-                data = await resp.json(content_type=None)
-                if "error" in data:
-                    log.error(f"SMS ошибка smsc.ru: {data}")
+                result = await resp.text()
+                log.info(f"smsc.ru ответ: {result}")
+                # Успех если нет слова ERROR
+                if "ERROR" in result.upper():
+                    log.error(f"SMS ошибка: {result}")
                     return False
-                log.info(f"SMS отправлен на {SMS_PHONE}, id={data.get('id')}")
+                log.info(f"SMS отправлен на {SMS_PHONE}")
                 return True
 
     except Exception as e:
@@ -43,32 +45,15 @@ async def send_sms(text: str) -> bool:
 
 
 async def notify_sms_new_order(service_name: str, phone: str, client_name: str) -> bool:
-    """SMS о новой заявке на услугу."""
-    text = (
-        f"ВашСад: заявка!\n"
-        f"{service_name}\n"
-        f"{client_name}\n"
-        f"Тел: {phone}"
-    )
+    text = f"ВашСад: заявка!\n{service_name}\n{client_name}\nТел: {phone}"
     return await send_sms(text)
 
 
 async def notify_sms_new_project(area: str, phone: str, client_name: str) -> bool:
-    """SMS о новом брифе на проект."""
-    text = (
-        f"ВашСад: проект!\n"
-        f"Участок {area}\n"
-        f"{client_name}\n"
-        f"Тел: {phone}"
-    )
+    text = f"ВашСад: проект!\nУчасток {area}\n{client_name}\nТел: {phone}"
     return await send_sms(text)
 
 
 async def notify_sms_payment(service_name: str, amount: str) -> bool:
-    """SMS о полученной оплате (вызывается из webhook YooKassa)."""
-    text = (
-        f"ВашСад: оплата!\n"
-        f"{service_name}\n"
-        f"Сумма: {amount} руб."
-    )
+    text = f"ВашСад: оплата!\n{service_name}\nСумма: {amount} руб."
     return await send_sms(text)
