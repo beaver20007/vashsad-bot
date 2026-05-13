@@ -15,6 +15,7 @@ from keyboards import (
     back_to_menu_keyboard, cancel_keyboard
 )
 from services.email_service import notify_email_new_order, notify_email_new_project
+from services.sms_service import notify_sms_new_order, notify_sms_new_project
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -221,6 +222,7 @@ async def _finish_contact(message, state, email, user, edit=False):
     await asyncio.gather(
         notify_all(message.bot, designer_msg),
         notify_email_new_order(user_info, svc_name, price_str, phone, email, dt),
+        notify_sms_new_order(svc_name, phone, user.full_name),
     )
 
     result_text = (
@@ -392,6 +394,7 @@ async def _finish_brief(message, state, email, user, edit=False):
     import asyncio
     await asyncio.gather(
         notify_all(message.bot, designer_msg),
+        notify_sms_new_project(data.get("area", "?"), phone, user.full_name),
         notify_email_new_project(
             user_info, data.get("area", "?"), data.get("existing", "?"),
             data.get("style", "?"), data.get("wishes", "?"), phone, email, dt
