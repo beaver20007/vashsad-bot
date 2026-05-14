@@ -1,11 +1,11 @@
-"""Хендлер фото-диагностики болезней растений"""
+"""Хендлер фото-диагностики — с сохранением в PostgreSQL"""
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, PhotoSize
 
 from config import FREE_PHOTO_LIMIT
 from keyboards import back_to_menu_keyboard, subscribe_keyboard, cancel_keyboard
-from services.storage import get_or_create_user, can_use_photo, update_user
+from services.database import get_or_create_user, can_use_photo, update_user, save_diagnosis
 from services.ai import ask_claude_with_image
 
 router = Router()
@@ -24,7 +24,7 @@ PHOTO_PROMPT_TEXT = (
 
 @router.message(Command("photo"))
 async def cmd_photo(message: Message):
-    user = get_or_create_user(message.from_user.id)
+    user = await get_or_create_user(message.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
         await message.answer(
             f"⚠️ Лимит бесплатных фото-диагностик исчерпан "
@@ -39,7 +39,7 @@ async def cmd_photo(message: Message):
 
 @router.callback_query(F.data == "menu:photo")
 async def cb_photo(callback: CallbackQuery):
-    user = get_or_create_user(callback.from_user.id)
+    user = await get_or_create_user(callback.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
         await callback.message.edit_text(
             f"⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
@@ -49,19 +49,15 @@ async def cb_photo(callback: CallbackQuery):
         )
         await callback.answer()
         return
-
     await callback.message.edit_text(
-        PHOTO_PROMPT_TEXT,
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
+        PHOTO_PROMPT_TEXT, parse_mode="HTML", reply_markup=cancel_keyboard(),
     )
     await callback.answer()
 
 
 @router.message(F.photo)
 async def handle_photo(message: Message):
-    """Обрабатываем любое фото как запрос на диагностику"""
-    user = get_or_create_user(
+    user = await get_or_create_user(
         message.from_user.id,
         username=message.from_user.username,
         first_name=message.from_user.first_name,
@@ -76,39 +72,41 @@ async def handle_photo(message: Message):
         )
         return
 
-    # Показываем индикатор
     processing_msg = await message.answer(
-        "🔍 <b>Анализирую ваше растение...</b>\n\n"
-        "<i>Это займёт несколько секунд.</i>",
+        "🔍 <b>Анализирую ваше растение...</b>\n\n<i>Это займёт несколько секунд.</i>",
         parse_mode="HTML",
     )
     await message.bot.send_chat_action(message.chat.id, "typing")
 
-    # Скачиваем фото (берём наибольшее разрешение)
     photo: PhotoSize = message.photo[-1]
     file = await message.bot.get_file(photo.file_id)
     file_bytes = await message.bot.download_file(file.file_path)
 
-    # Вопрос пользователя (caption если есть)
     user_question = message.caption or "Что не так с этим растением? Поставь диагноз."
 
-    # Анализ через Claude Vision
     result = await ask_claude_with_image(
         image_bytes=file_bytes.read(),
         mime_type="image/jpeg",
         question=user_question,
     )
 
+    # ── Сохраняем диагностику в БД ──
+    await save_diagnosis(
+        telegram_id=message.from_user.id,
+        file_id=photo.file_id,
+        question=user_question,
+        result=result,
+    )
+
     # Обновляем счётчик
     if not user.is_subscribed:
         user.photo_count += 1
         remaining = FREE_PHOTO_LIMIT - user.photo_count
-        update_user(user)
+        await update_user(user)
         footer = f"\n\n<i>Осталось бесплатных диагностик: {remaining}/{FREE_PHOTO_LIMIT}</i>"
     else:
         footer = ""
 
-    # Удаляем сообщение «анализирую»
     await processing_msg.delete()
 
     await message.answer(
