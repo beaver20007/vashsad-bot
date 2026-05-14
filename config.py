@@ -74,3 +74,4 @@ SERVICES = {
         "description": "Полный ландшафтный проект — индивидуальный расчёт"
     },
 }
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad.vercel.app")
