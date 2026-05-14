@@ -7,7 +7,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_NAME, BOT_NAME, MINI_APP_URL
+from config import BOT_NAME, DESIGNER_NAME, DESIGNER_NAME_GEN, MINI_APP_URL
 from keyboards import main_menu_keyboard, back_to_menu_keyboard
 from services.database import get_or_create_user   # ← async версия
 
@@ -60,8 +60,7 @@ async def cmd_start(message: Message):
         first_name=message.from_user.first_name,
     )
     name = user.first_name or "друг"
-    text = WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME)
-
+    text = WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
     await message.answer(
         f"👋 Привет, {name}!\n\n" + text,
         reply_markup=mini_app_keyboard(),
@@ -100,7 +99,7 @@ async def cmd_help(message: Message):
 @router.callback_query(F.data == "menu:main")
 async def cb_main_menu(callback: CallbackQuery):
     await callback.message.edit_text(
-        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME),
+        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN),
         reply_markup=mini_app_keyboard(),
         parse_mode="HTML",
     )
@@ -110,7 +109,7 @@ async def cb_main_menu(callback: CallbackQuery):
 @router.callback_query(F.data == "cancel")
 async def cb_cancel(callback: CallbackQuery):
     await callback.message.edit_text(
-        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME),
+        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN),
         reply_markup=mini_app_keyboard(),
         parse_mode="HTML",
     )

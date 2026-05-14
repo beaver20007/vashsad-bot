@@ -23,6 +23,7 @@ SUBSCRIPTION_PRICE = int(os.getenv("SUBSCRIPTION_PRICE", "299"))
 
 # ── Дизайнер ────────────────────────────────
 DESIGNER_NAME = os.getenv("DESIGNER_NAME", "Ваш дизайнер")
+DESIGNER_NAME_GEN = os.getenv("DESIGNER_NAME_GEN", "Анны Аркадьевой")
 BOT_NAME = "ВашСад Бот"
 
 # ── YooKassa ────────────────────────────────
