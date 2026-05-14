@@ -1,9 +1,10 @@
-"""Хендлер заказа услуг и проектов"""
+"""Хендлер заказа — с сохранением в PostgreSQL"""
 import logging
 import os
+import asyncio
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -12,8 +13,9 @@ from aiogram.types import InlineKeyboardButton
 from config import SERVICES, DESIGNER_TELEGRAM_ID, DESIGNER_NAME
 from keyboards import (
     services_keyboard, order_confirm_keyboard,
-    back_to_menu_keyboard, cancel_keyboard
+    back_to_menu_keyboard, cancel_keyboard,
 )
+from services.database import get_or_create_user, save_order  # ← БД
 from services.email_service import notify_email_new_order, notify_email_new_project
 from services.sms_service import notify_sms_new_order, notify_sms_new_project
 
@@ -49,7 +51,7 @@ def skip_inline_keyboard():
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="➡️ Пропустить", callback_data="skip_extra"),
-        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+        InlineKeyboardButton(text="❌ Отмена",      callback_data="cancel"),
     )
     return builder.as_markup()
 
@@ -83,33 +85,25 @@ PHONE_PROMPT = (
 )
 
 EMAIL_PROMPT = (
-    "📧 <b>Email</b>\n\n"
-    "Введите ваш email для отправки материалов.\n\n"
-    "Или нажмите «Пропустить»."
+    "📧 <b>Email</b>\n\nВведите email или нажмите «Пропустить»."
 )
 
 
-# ══════════════════════════════════════════════════════════════
-#  СТАРТОВЫЕ УСЛУГИ
-# ══════════════════════════════════════════════════════════════
+# ── Стартовые услуги ──
 
 @router.message(Command("order"))
 async def cmd_order(message: Message):
     await message.answer(
-        "📋 <b>Заказать услугу</b>\n\n"
-        "Выберите нужную услугу или закажите индивидуальный проект:",
-        parse_mode="HTML",
-        reply_markup=services_keyboard(),
+        "📋 <b>Заказать услугу</b>\n\nВыберите нужную услугу:",
+        parse_mode="HTML", reply_markup=services_keyboard(),
     )
 
 
 @router.callback_query(F.data == "menu:order")
 async def cb_order(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📋 <b>Заказать услугу</b>\n\n"
-        "Выберите нужную услугу или закажите индивидуальный проект:",
-        parse_mode="HTML",
-        reply_markup=services_keyboard(),
+        "📋 <b>Заказать услугу</b>\n\nВыберите нужную услугу:",
+        parse_mode="HTML", reply_markup=services_keyboard(),
     )
     await callback.answer()
 
@@ -118,8 +112,7 @@ async def cb_order(callback: CallbackQuery):
 async def cb_order_start(callback: CallbackQuery):
     await callback.message.edit_text(
         "📋 <b>Стартовые услуги</b>\n\nВыберите услугу:",
-        parse_mode="HTML",
-        reply_markup=services_keyboard(),
+        parse_mode="HTML", reply_markup=services_keyboard(),
     )
     await callback.answer()
 
@@ -137,9 +130,8 @@ async def cb_service_detail(callback: CallbackQuery):
         f"💰 Стоимость: <b>{price_str}</b>\n"
         f"⏱ Срок: {svc['duration']}\n\n"
         f"📝 {svc['description']}\n\n"
-        f"Нажмите «Подтвердить заказ» и мы свяжемся с вами в течение 24 часов.",
-        parse_mode="HTML",
-        reply_markup=order_confirm_keyboard(key),
+        f"Нажмите «Подтвердить» — свяжемся в течение 24 часов.",
+        parse_mode="HTML", reply_markup=order_confirm_keyboard(key),
     )
     await callback.answer()
 
@@ -153,12 +145,9 @@ async def cb_confirm_service(callback: CallbackQuery, state: FSMContext):
         return
     await state.update_data(service_key=key, service_name=svc["name"], service_price=svc["price"])
     await state.set_state(OrderForm.contact_phone)
-
     await callback.message.edit_text(
-        f"✅ Вы выбрали: <b>{svc['name']}</b>\n\n"
-        f"{PHONE_PROMPT}",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
+        f"✅ Вы выбрали: <b>{svc['name']}</b>\n\n{PHONE_PROMPT}",
+        parse_mode="HTML", reply_markup=cancel_keyboard(),
     )
     await callback.answer()
 
@@ -168,15 +157,11 @@ async def contact_phone(message: Message, state: FSMContext):
     phone = normalize_phone(message.text or "")
     await state.update_data(phone=phone)
     await state.set_state(OrderForm.contact_extra)
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
+    try: await message.delete()
+    except Exception: pass
     await message.answer(
         f"✅ Телефон: <code>{phone}</code>\n\n{EMAIL_PROMPT}",
-        parse_mode="HTML",
-        reply_markup=skip_inline_keyboard(),
+        parse_mode="HTML", reply_markup=skip_inline_keyboard(),
     )
 
 
@@ -190,10 +175,8 @@ async def skip_contact_extra(callback: CallbackQuery, state: FSMContext):
 @router.message(OrderForm.contact_extra)
 async def contact_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    try: await message.delete()
+    except Exception: pass
     await _finish_contact(message, state, email=email, user=message.from_user)
 
 
@@ -208,6 +191,16 @@ async def _finish_contact(message, state, email, user, edit=False):
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
     dt        = message.date.strftime("%d.%m.%Y %H:%M")
 
+    # ── Сохраняем в БД ──
+    await save_order(
+        telegram_id=user.id,
+        service_type="service",
+        service_name=svc_name,
+        service_price=svc_price,
+        phone=phone,
+        email=email,
+    )
+
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА — ВашСад Бот</b>\n\n"
         f"👤 Клиент: {user_info}\n"
@@ -217,8 +210,6 @@ async def _finish_contact(message, state, email, user, edit=False):
         f"📧 Email: {email}\n\n"
         f"⏰ {dt}"
     )
-    # Telegram + Email параллельно
-    import asyncio
     await asyncio.gather(
         notify_all(message.bot, designer_msg),
         notify_email_new_order(user_info, svc_name, price_str, phone, email, dt),
@@ -233,7 +224,6 @@ async def _finish_contact(message, state, email, user, edit=False):
         f"<b>{DESIGNER_NAME}</b> свяжется с вами в течение 24 часов.\n\n"
         f"Спасибо, что выбрали ВашСад! 🌿"
     )
-
     if edit:
         await message.edit_text(result_text, parse_mode="HTML",
                                 reply_markup=back_to_menu_keyboard())
@@ -242,9 +232,7 @@ async def _finish_contact(message, state, email, user, edit=False):
                              reply_markup=back_to_menu_keyboard())
 
 
-# ══════════════════════════════════════════════════════════════
-#  БРИФ ДЛЯ ИНДИВИДУАЛЬНОГО ПРОЕКТА
-# ══════════════════════════════════════════════════════════════
+# ── Бриф индивидуального проекта ──
 
 @router.callback_query(F.data == "order:project")
 async def cb_order_project(callback: CallbackQuery, state: FSMContext):
@@ -254,8 +242,7 @@ async def cb_order_project(callback: CallbackQuery, state: FSMContext):
         "Заполним небольшой бриф — 4 вопроса + контакты.\n\n"
         "📐 <b>Вопрос 1/4:</b> Какова площадь вашего участка?\n"
         "<i>Например: 10 соток, 15 соток, 0.5 га</i>",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
+        parse_mode="HTML", reply_markup=cancel_keyboard(),
     )
     await callback.answer()
 
@@ -264,10 +251,8 @@ async def cb_order_project(callback: CallbackQuery, state: FSMContext):
 async def brief_area(message: Message, state: FSMContext):
     await state.update_data(area=message.text)
     await state.set_state(OrderForm.brief_existing)
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    try: await message.delete()
+    except Exception: pass
 
     builder = InlineKeyboardBuilder()
     for text, data in [
@@ -281,8 +266,7 @@ async def brief_area(message: Message, state: FSMContext):
 
     await message.answer(
         "🏠 <b>Вопрос 2/4:</b> Что сейчас есть на участке?",
-        parse_mode="HTML",
-        reply_markup=builder.as_markup(),
+        parse_mode="HTML", reply_markup=builder.as_markup(),
     )
 
 
@@ -298,8 +282,7 @@ async def brief_existing(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_text(
         "🎨 <b>Вопрос 3/4:</b> Какой стиль сада вам нравится?",
-        parse_mode="HTML",
-        reply_markup=builder.as_markup(),
+        parse_mode="HTML", reply_markup=builder.as_markup(),
     )
     await callback.answer()
 
@@ -309,13 +292,10 @@ async def brief_style(callback: CallbackQuery, state: FSMContext):
     code = callback.data.split(":")[1]
     await state.update_data(style=STYLE_KB_TEXT.get(code, code))
     await state.set_state(OrderForm.brief_wishes)
-
     await callback.message.edit_text(
         "💬 <b>Вопрос 4/4:</b> Что самое важное для вас в саду?\n\n"
-        "<i>Напишите текстом: газон, цветники, зона отдыха, "
-        "детская площадка, огород и т.д.</i>",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
+        "<i>Напишите текстом: газон, цветники, зона отдыха, огород и т.д.</i>",
+        parse_mode="HTML", reply_markup=cancel_keyboard(),
     )
     await callback.answer()
 
@@ -324,15 +304,11 @@ async def brief_style(callback: CallbackQuery, state: FSMContext):
 async def brief_wishes(message: Message, state: FSMContext):
     await state.update_data(wishes=message.text)
     await state.set_state(OrderForm.brief_phone)
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
+    try: await message.delete()
+    except Exception: pass
     await message.answer(
         f"📱 <b>Контакты 1/2 — Телефон</b>\n\n{PHONE_PROMPT}",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
+        parse_mode="HTML", reply_markup=cancel_keyboard(),
     )
 
 
@@ -341,16 +317,11 @@ async def brief_phone(message: Message, state: FSMContext):
     phone = normalize_phone(message.text or "")
     await state.update_data(phone=phone)
     await state.set_state(OrderForm.brief_extra)
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
+    try: await message.delete()
+    except Exception: pass
     await message.answer(
-        f"✅ Телефон: <code>{phone}</code>\n\n"
-        f"📧 <b>Контакты 2/2 — Email</b>\n\n{EMAIL_PROMPT}",
-        parse_mode="HTML",
-        reply_markup=skip_inline_keyboard(),
+        f"✅ Телефон: <code>{phone}</code>\n\n{EMAIL_PROMPT}",
+        parse_mode="HTML", reply_markup=skip_inline_keyboard(),
     )
 
 
@@ -364,10 +335,8 @@ async def skip_brief_extra(callback: CallbackQuery, state: FSMContext):
 @router.message(OrderForm.brief_extra)
 async def brief_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    try: await message.delete()
+    except Exception: pass
     await _finish_brief(message, state, email=email, user=message.from_user)
 
 
@@ -378,6 +347,18 @@ async def _finish_brief(message, state, email, user, edit=False):
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
     phone     = data.get("phone", "не указан")
     dt        = message.date.strftime("%d.%m.%Y %H:%M")
+
+    # ── Сохраняем в БД ──
+    await save_order(
+        telegram_id=user.id,
+        service_type="project",
+        area=data.get("area"),
+        existing=data.get("existing"),
+        style=data.get("style"),
+        wishes=data.get("wishes"),
+        phone=phone,
+        email=email,
+    )
 
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА НА ПРОЕКТ — ВашСад Бот</b>\n\n"
@@ -390,14 +371,12 @@ async def _finish_brief(message, state, email, user, edit=False):
         f"📧 Email: {email}\n\n"
         f"⏰ {dt}"
     )
-
-    import asyncio
     await asyncio.gather(
         notify_all(message.bot, designer_msg),
         notify_sms_new_project(data.get("area", "?"), phone, user.full_name),
         notify_email_new_project(
-            user_info, data.get("area", "?"), data.get("existing", "?"),
-            data.get("style", "?"), data.get("wishes", "?"), phone, email, dt
+            user_info, data.get("area","?"), data.get("existing","?"),
+            data.get("style","?"), data.get("wishes","?"), phone, email, dt,
         ),
     )
 
@@ -409,7 +388,6 @@ async def _finish_brief(message, state, email, user, edit=False):
         f"и рассчитает стоимость проекта.\n\n"
         f"Спасибо, что выбрали ВашСад! 🌿"
     )
-
     if edit:
         await message.edit_text(result_text, parse_mode="HTML",
                                 reply_markup=back_to_menu_keyboard())
