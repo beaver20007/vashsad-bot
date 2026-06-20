@@ -3,13 +3,14 @@ import logging
 from datetime import datetime, timedelta
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_TELEGRAM_ID, DESIGNER_NAME
 from services.database import _pool
+from services.calendar_service import generate_ics, build_google_calendar_url
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -134,6 +135,30 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
         await conn.execute("UPDATE booking_slots SET is_booked=TRUE WHERE id=$1", slot_id)
 
     dt = datetime.fromisoformat(slot_dt)
+
+    # Определяем продолжительность услуги
+    duration_map = {"consultation": 1.0, "photo_review": 0.5, "strategy": 1.5}
+    duration_h = duration_map.get(svc_key, 1.0)
+
+    ics_description = (
+        f"Услуга: {svc_name}\n"
+        f"Телефон: {phone}\n"
+        f"Дизайнер: {DESIGNER_NAME}"
+    )
+    gcal_url = build_google_calendar_url(
+        title=f"Консультация ВашСад — {svc_name}",
+        start_dt=dt,
+        duration_hours=duration_h,
+        location="Онлайн (Telegram)",
+        description=ics_description,
+    )
+
+    builder_gcal = InlineKeyboardBuilder()
+    builder_gcal.row(InlineKeyboardButton(
+        text="📅 Добавить в Google Calendar",
+        url=gcal_url,
+    ))
+
     await message.answer(
         f"🎉 <b>Запись подтверждена!</b>\n\n"
         f"📅 {dt.strftime('%d %b в %H:%M')}\n"
@@ -141,7 +166,25 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
         f"📞 {phone}\n\n"
         f"Дизайнер свяжется с вами для подтверждения. До встречи! 🌿",
         parse_mode="HTML",
+        reply_markup=builder_gcal.as_markup(),
     )
+
+    # Отправляем ICS-файл
+    try:
+        ics_bytes = generate_ics(
+            title=f"Консультация ВашСад — {svc_name}",
+            start_dt=dt,
+            duration_hours=duration_h,
+            location="Онлайн (Telegram)",
+            description=ics_description,
+            organizer_email="info@vashsad.ru",
+        )
+        await message.answer_document(
+            BufferedInputFile(ics_bytes, filename="консультация.ics"),
+            caption="📎 Файл для добавления в любой календарь (iCal, Apple Calendar, Outlook)",
+        )
+    except Exception as e:
+        log.warning("Ошибка генерации ICS: %s", e)
 
     # Планируем напоминания за 24ч и 1ч
     try:

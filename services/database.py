@@ -192,6 +192,7 @@ async def _create_tables() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(12) UNIQUE",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT REFERENCES users(telegram_id)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_messages INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS lang VARCHAR(5) DEFAULT 'ru'",
         ]:
             await conn.execute(col_sql)
     log.info("✅ Таблицы созданы / проверены")
@@ -218,6 +219,7 @@ class User:
     referral_code: Optional[str] = None
     referred_by: Optional[int] = None
     bonus_messages: int = 0
+    lang: str = "ru"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -228,26 +230,33 @@ async def get_or_create_user(
     telegram_id: int,
     username: str = None,
     first_name: str = None,
+    language_code: str = None,
 ) -> User:
+    lang = "en" if (language_code or "").startswith("en") else "ru"
     async with _pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT * FROM users WHERE telegram_id = $1", telegram_id
         )
         if row is None:
             await conn.execute(
-                """INSERT INTO users (telegram_id, username, first_name)
-                   VALUES ($1, $2, $3)
+                """INSERT INTO users (telegram_id, username, first_name, lang)
+                   VALUES ($1, $2, $3, $4)
                    ON CONFLICT (telegram_id) DO NOTHING""",
-                telegram_id, username, first_name,
+                telegram_id, username, first_name, lang,
             )
             row = await conn.fetchrow(
                 "SELECT * FROM users WHERE telegram_id = $1", telegram_id
             )
-        # Обновляем username/first_name если изменились
+        # Обновляем username/first_name/lang если изменились
         if username and row["username"] != username:
             await conn.execute(
-                "UPDATE users SET username=$1, updated_at=NOW() WHERE telegram_id=$2",
-                username, telegram_id,
+                "UPDATE users SET username=$1, lang=$2, updated_at=NOW() WHERE telegram_id=$3",
+                username, lang, telegram_id,
+            )
+        elif language_code and row.get("lang") != lang:
+            await conn.execute(
+                "UPDATE users SET lang=$1, updated_at=NOW() WHERE telegram_id=$2",
+                lang, telegram_id,
             )
         # Загружаем историю чата
         history_rows = await conn.fetch(
@@ -275,6 +284,7 @@ async def get_or_create_user(
         referral_code=row.get("referral_code"),
         referred_by=row.get("referred_by"),
         bonus_messages=row.get("bonus_messages") or 0,
+        lang=row.get("lang") or "ru",
     )
 
 
@@ -491,6 +501,15 @@ async def get_or_create_referral_code(telegram_id: int) -> str:
             code, telegram_id,
         )
         return code
+
+
+async def add_bonus_messages(telegram_id: int, count: int) -> None:
+    """Начислить бонусные сообщения пользователю."""
+    async with _pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET bonus_messages=bonus_messages+$1, updated_at=NOW() WHERE telegram_id=$2",
+            count, telegram_id,
+        )
 
 
 async def apply_referral(new_user_id: int, referral_code: str) -> bool:

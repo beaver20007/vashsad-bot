@@ -355,45 +355,86 @@ docker compose restart bot
 
 ---
 
-## Deployment
+## Деплой на VPS
 
-### Docker (VPS / Railway)
+### Требования
+- Ubuntu 22.04 LTS
+- Docker + Docker Compose v2
+- nginx
+- Python 3.12 (для скриптов)
+- Домен с SSL (Let's Encrypt)
 
-```bash
-# Собрать и запустить
-docker-compose up -d --build
+### Первичный деплой
 
-# Посмотреть логи
-docker-compose logs -f bot
-```
-
-`docker-compose.yml` запускает бота и Redis. База данных (PostgreSQL/Neon) — внешний сервис, настраивается через `DATABASE_URL`.
-
-### Railway
-
-1. Создай новый проект на [railway.app](https://railway.app)
-2. Подключи репозиторий `vashsad-full`
-3. Добавь все переменные окружения через Variables
-4. Railway автоматически использует `Dockerfile`
-
-### Mini App (Vercel)
+#### 1. Подготовка сервера
 
 ```bash
-cd vashsad-miniapp
-vercel deploy
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin nginx certbot python3-certbot-nginx git
 ```
 
-Добавь переменные окружения в настройках Vercel-проекта. Укажи URL деплоя в `MINI_APP_URL` бота.
-
-### Настройка BotFather
-
-После деплоя выполни один раз:
+#### 2. Клонирование репозитория
 
 ```bash
-python setup_bot.py
+git clone https://github.com/YOUR_USERNAME/vashsad-full.git /opt/vashsad
+cd /opt/vashsad
 ```
 
-Скрипт установит имя, описание, фото и команды бота через Bot API.
+#### 3. Настройка окружения
+
+```bash
+cp .env.example .env
+nano .env  # заполнить все переменные
+```
+
+#### 4. SSL сертификат
+
+```bash
+sudo certbot --nginx -d YOUR_DOMAIN
+```
+
+#### 5. nginx
+
+```bash
+sudo cp nginx.conf /etc/nginx/sites-available/vashsad
+sudo ln -s /etc/nginx/sites-available/vashsad /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+#### 6. БД миграции
+
+```bash
+python3 scripts/migrate.py
+```
+
+#### 7. Сидирование данных
+
+```bash
+bash scripts/seed_all.sh
+```
+
+#### 8. Настройка бота
+
+```bash
+python3 setup_bot.py         # имя, описание, команды
+python3 setup_bot.py --webhook  # регистрация webhook
+```
+
+#### 9. Запуск
+
+```bash
+bash scripts/deploy.sh
+```
+
+#### 10. Проверка
+
+```bash
+curl https://YOUR_DOMAIN/api/health
+```
+
+### Обновление (CI/CD)
+
+Push в main → GitHub Actions автоматически деплоит.
+Ручное обновление: `bash scripts/deploy.sh`
 
 ---
 

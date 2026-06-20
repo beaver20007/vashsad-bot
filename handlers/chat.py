@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 
 from config import FREE_CHAT_LIMIT, SUBSCRIPTION_PRICE
 from keyboards import back_to_menu_keyboard, subscribe_keyboard
-from services.database import get_or_create_user, can_use_chat, add_message_to_history, update_user
+from services.database import get_or_create_user, can_use_chat, add_message_to_history, update_user, add_bonus_messages
 from services.ai import ask_claude, SYSTEM_PROMPT
 
 router = Router()
@@ -139,8 +139,11 @@ async def handle_text_message(message: Message):
         first_name=message.from_user.first_name,
     )
 
-    # Проверяем лимит
-    if not can_use_chat(user, FREE_CHAT_LIMIT):
+    # Проверяем бонусные сообщения (приоритет над обычным лимитом)
+    use_bonus = False
+    if not user.is_subscribed and user.bonus_messages > 0:
+        use_bonus = True
+    elif not can_use_chat(user, FREE_CHAT_LIMIT):
         await message.answer(
             LIMIT_REACHED_TEXT,
             parse_mode="HTML",
@@ -175,10 +178,16 @@ async def handle_text_message(message: Message):
 
     # Обновляем счётчик
     if not user.is_subscribed:
-        user.chat_count += 1
-        remaining = FREE_CHAT_LIMIT - user.chat_count
-        await update_user(user)
-        footer = f"\n\n<i>Осталось бесплатных сообщений: {remaining}/{FREE_CHAT_LIMIT}</i>"
+        if use_bonus:
+            # Списываем бонусное сообщение
+            await add_bonus_messages(user.telegram_id, -1)
+            user.bonus_messages -= 1
+            footer = f"\n\n<i>Использовано бонусное сообщение. Осталось бонусных: {user.bonus_messages}</i>"
+        else:
+            user.chat_count += 1
+            remaining = FREE_CHAT_LIMIT - user.chat_count
+            await update_user(user)
+            footer = f"\n\n<i>Осталось бесплатных сообщений: {remaining}/{FREE_CHAT_LIMIT}</i>"
     else:
         footer = ""
 

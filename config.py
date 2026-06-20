@@ -82,5 +82,8 @@ SERVICES = {
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad.vercel.app")
 WELCOME_IMAGE_URL = os.getenv("WELCOME_IMAGE_URL", "")
 
+# ── Канал ────────────────────────────────────
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@vashsad_channel")
+
 # ── Sentry ───────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")

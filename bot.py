@@ -30,10 +30,15 @@ from handlers.booking import router as booking_router
 from handlers.promo import router as promo_router
 from handlers.inline_mode import router as inline_router
 from handlers.moderation import router as moderation_router, BanCheckMiddleware
+from handlers.rate_limit import RateLimitMiddleware
 from handlers.export import router as export_router
 from handlers.payment_stars import router as payment_stars_router
 from handlers.poll import router as poll_router
 from handlers.watering import router as watering_router
+from handlers.nurseries import router as nurseries_router
+from handlers.season_plan import router as season_plan_router
+from handlers.saved_replies import router as saved_replies_router
+from handlers.channel import router as channel_router
 from handlers.chat import router as chat_router   # ← chat ПОСЛЕДНИМ
 
 from services.database import init_db, close_db
@@ -82,6 +87,7 @@ async def main():
     # Порядок важен! FSM-роутеры ДО chat_router
     dp.message.middleware(BanCheckMiddleware())
     dp.callback_query.middleware(BanCheckMiddleware())
+    dp.message.middleware(RateLimitMiddleware(limit=20, window=60))
 
     dp.include_routers(
         start_router,
@@ -104,6 +110,10 @@ async def main():
         payment_stars_router,
         poll_router,
         watering_router,
+        nurseries_router,
+        season_plan_router,
+        saved_replies_router,
+        channel_router,
         chat_router,    # ВСЕГДА ПОСЛЕДНИМ
     )
 

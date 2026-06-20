@@ -278,3 +278,109 @@ def generate_guide_pdf(designer_name: str = DESIGNER_NAME) -> bytes:
 
     doc.build(story)
     return buffer.getvalue()
+
+
+def generate_clients_pdf(clients_data: list, designer_name: str = DESIGNER_NAME) -> bytes:
+    """Генерирует PDF со списком клиентов (уникальные по telegram_id из orders)."""
+    from datetime import date
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    cover_title_style = ParagraphStyle(
+        "ClientsCoverTitle", parent=styles["Normal"],
+        fontSize=24, textColor=SAGE, alignment=TA_CENTER,
+        fontName="Helvetica-Bold", spaceAfter=6,
+    )
+    cover_sub_style = ParagraphStyle(
+        "ClientsCoverSub", parent=styles["Normal"],
+        fontSize=11, textColor=EARTH, alignment=TA_CENTER,
+        spaceAfter=4,
+    )
+    footer_style = ParagraphStyle(
+        "ClientsFooter", parent=styles["Normal"],
+        fontSize=8, textColor=EARTH, alignment=TA_CENTER,
+        spaceBefore=12,
+    )
+    cell_style = ParagraphStyle(
+        "ClientsCell", parent=styles["Normal"],
+        fontSize=7, leading=9,
+    )
+
+    STATUS_RU = {
+        "new": "Новая",
+        "in_progress": "В работе",
+        "review": "Согласование",
+        "done": "Выполнена",
+        "canceled": "Отменена",
+    }
+
+    story = []
+
+    # ── Обложка ──
+    story.append(Spacer(1, 1.5*cm))
+    story.append(Paragraph("Клиенты ВашСад", cover_title_style))
+    story.append(HRFlowable(width="80%", thickness=2, color=SAGE, hAlign="CENTER"))
+    story.append(Spacer(1, 0.4*cm))
+    story.append(Paragraph(f"Дата: {date.today().strftime('%d.%m.%Y')}", cover_sub_style))
+    story.append(Paragraph(f"Дизайнер: {designer_name}", cover_sub_style))
+    story.append(Paragraph(f"Всего клиентов: {len(clients_data)}", cover_sub_style))
+    story.append(Spacer(1, 0.8*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=EARTH))
+    story.append(Spacer(1, 0.5*cm))
+
+    if not clients_data:
+        story.append(Paragraph("Клиентов пока нет.", styles["Normal"]))
+    else:
+        headers = ["№", "Имя", "Телефон", "Услуга", "Регион", "Статус", "Дата"]
+        data = [headers]
+        for i, row in enumerate(clients_data, start=1):
+            status_raw = row.get("status") or ""
+            status = STATUS_RU.get(status_raw, status_raw) or "—"
+            created_at = row.get("created_at")
+            date_str = created_at.strftime("%d.%m.%y") if hasattr(created_at, "strftime") else str(created_at or "—")
+            data.append([
+                str(i),
+                Paragraph((row.get("name") or "—")[:18], cell_style),
+                Paragraph((row.get("phone") or "—")[:14], cell_style),
+                Paragraph((row.get("service_type") or "—")[:22], cell_style),
+                Paragraph((row.get("region") or "—")[:16], cell_style),
+                status,
+                date_str,
+            ])
+
+        col_widths = [0.8*cm, 3*cm, 2.5*cm, 4*cm, 2.8*cm, 2.4*cm, 1.8*cm]
+        tbl = Table(data, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), SAGE),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 8),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [white, CREAM]),
+            ("GRID",          (0, 0), (-1, -1), 0.3, HexColor("#D4CEC5")),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        story.append(tbl)
+
+    # ── Подвал ──
+    story.append(Spacer(1, 0.8*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=EARTH))
+    story.append(Paragraph(
+        f"Итого клиентов: {len(clients_data)}  ·  {designer_name}  ·  ВашСад Бот",
+        footer_style,
+    ))
+
+    doc.build(story)
+    return buffer.getvalue()

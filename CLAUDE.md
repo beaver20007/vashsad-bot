@@ -128,8 +128,15 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 - [x] Промокоды (handlers/promo.py)
 - [x] Онбординг (handlers/onboarding.py)
 - [x] Docker / docker-compose.yml
-- [ ] Настроить BotFather (имя, описание, фото, команды) — setup_bot.py готов
-- [ ] Задеплоить на VPS
+- [x] Настроить BotFather (имя, описание, фото, команды) — setup_bot.py готов
+- [x] Напоминания о поливе (handlers/watering.py)
+- [x] Опросы пользователей (handlers/poll.py)
+- [x] Мониторинг ошибок (Sentry, env: SENTRY_DSN)
+- [x] Кеширование (Redis/Upstash, env: UPSTASH_REDIS_REST_URL)
+- [x] CI/CD: GitHub Actions → Docker Hub → VPS (auto-deploy on push to main)
+- [x] pre-deploy check (scripts/pre_deploy_check.py)
+- [x] DESIGNER_NAME_GEN для welcome-текста в родительном падеже
+- [x] Задеплоить на VPS
 
 ## Miniapp API Routes
 Все роуты в `vashsad-miniapp/app/api/`:
@@ -164,6 +171,12 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 | `/api/stars` | Telegram Stars |
 | `/api/user` | Профиль пользователя |
 | `/api/weather` | Погода |
+
+## Deployment
+- Запуск: `docker compose up -d`
+- Перед деплоем: `python scripts/pre_deploy_check.py`
+- GitHub Actions автоматически деплоит при пуше в `main`
+- Требуемые secrets в репо: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `VPS_HOST`, `VPS_USER`, `VPS_KEY`
 
 ## AI Model
 Используем: `claude-sonnet-4-20250514`

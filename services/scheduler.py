@@ -3,11 +3,13 @@ services/scheduler.py
 Сезонные рассылки через APScheduler.
 """
 import logging
+import aiohttp
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from config import DESIGNER_TELEGRAM_ID
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
 
@@ -358,6 +360,26 @@ async def send_newsletter_blast(bot: Bot) -> None:
     log.info("Рассылка newsletter_blast завершена: отправлено %d, ошибок %d", total_sent, total_failed)
 
 
+async def self_ping_check(bot: Bot) -> None:
+    """Каждые 10 минут проверяет health-check miniapp и уведомляет дизайнера при сбое."""
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(
+                'http://localhost:3000/api/health',
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as r:
+                if r.status != 200:
+                    await bot.send_message(
+                        DESIGNER_TELEGRAM_ID,
+                        f"⚠️ Health check failed! HTTP {r.status}"
+                    )
+    except Exception:
+        try:
+            await bot.send_message(DESIGNER_TELEGRAM_ID, "⚠️ Miniapp не отвечает!")
+        except Exception:
+            pass
+
+
 _scheduler_instance: AsyncIOScheduler | None = None
 
 
@@ -392,6 +414,14 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
         CronTrigger(day_of_week="mon", hour=9, timezone="Europe/Moscow"),
         args=[bot],
         id="newsletter_blast",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        self_ping_check,
+        'interval',
+        minutes=10,
+        args=[bot],
+        id='self_ping',
         replace_existing=True,
     )
     global _scheduler_instance

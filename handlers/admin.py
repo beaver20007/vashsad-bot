@@ -382,9 +382,13 @@ async def cmd_broadcast_segment(message: Message):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐ Только подписчики", callback_data="bseg:subscribed")],
+        [InlineKeyboardButton(text="🌟 Подписчики Stars", callback_data="bseg:stars_subscribers")],
+        [InlineKeyboardButton(text="📋 Есть заявки", callback_data="bseg:with_orders")],
         [InlineKeyboardButton(text="📍 Нижегородская область", callback_data="bseg:region_нижегородская")],
         [InlineKeyboardButton(text="📍 Владимирская область", callback_data="bseg:region_владимирская")],
+        [InlineKeyboardButton(text="📍 Московская область", callback_data="bseg:region_московская")],
         [InlineKeyboardButton(text="🆕 Новые (7 дней)", callback_data="bseg:new_7d")],
+        [InlineKeyboardButton(text="😴 Неактивные (30 дней)", callback_data="bseg:inactive_30d")],
         [InlineKeyboardButton(text="👥 Все пользователи", callback_data="bseg:all")],
     ])
     await message.answer("📣 Выберите сегмент рассылки:", reply_markup=keyboard)
@@ -402,9 +406,13 @@ async def cb_segment_chosen(callback: CallbackQuery):
 
     segment_labels = {
         'subscribed': 'подписчики',
+        'stars_subscribers': 'подписчики Stars (активная подписка)',
+        'with_orders': 'пользователи с заявками',
         'region_нижегородская': 'Нижегородская обл.',
         'region_владимирская': 'Владимирская обл.',
+        'region_московская': 'Московская обл.',
         'new_7d': 'новые за 7 дней',
+        'inactive_30d': 'неактивные 30 дней',
         'all': 'все пользователи',
     }
     label = segment_labels.get(segment, segment)
@@ -426,11 +434,40 @@ async def receive_segment_text(message: Message):
     async with _pool.acquire() as conn:
         if segment == 'subscribed':
             users = await conn.fetch("SELECT telegram_id FROM users WHERE is_subscribed = TRUE AND (is_banned IS NOT TRUE)")
+        elif segment == 'stars_subscribers':
+            users = await conn.fetch(
+                "SELECT telegram_id FROM users WHERE subscription_expires_at > NOW() AND (is_banned IS NOT TRUE)"
+            )
+        elif segment == 'with_orders':
+            users = await conn.fetch(
+                """SELECT DISTINCT u.telegram_id FROM users u
+                   JOIN orders o ON o.telegram_id = u.telegram_id
+                   WHERE (u.is_banned IS NOT TRUE)"""
+            )
         elif segment.startswith('region_'):
             region = segment.replace('region_', '')
             users = await conn.fetch("SELECT telegram_id FROM users WHERE region ILIKE $1 AND (is_banned IS NOT TRUE)", f"%{region}%")
         elif segment == 'new_7d':
             users = await conn.fetch("SELECT telegram_id FROM users WHERE created_at > NOW() - INTERVAL '7 days' AND (is_banned IS NOT TRUE)")
+        elif segment == 'inactive_30d':
+            # last_activity column may not exist — fall back to created_at + zero chat_count
+            has_last_activity = await conn.fetchval(
+                """SELECT COUNT(*) FROM information_schema.columns
+                   WHERE table_name='users' AND column_name='last_activity'"""
+            )
+            if has_last_activity:
+                users = await conn.fetch(
+                    """SELECT telegram_id FROM users
+                       WHERE last_activity < NOW() - INTERVAL '30 days'
+                       AND (is_banned IS NOT TRUE)"""
+                )
+            else:
+                users = await conn.fetch(
+                    """SELECT telegram_id FROM users
+                       WHERE created_at < NOW() - INTERVAL '30 days'
+                       AND chat_count = 0
+                       AND (is_banned IS NOT TRUE)"""
+                )
         else:
             users = await conn.fetch("SELECT telegram_id FROM users WHERE is_banned IS NOT TRUE")
 

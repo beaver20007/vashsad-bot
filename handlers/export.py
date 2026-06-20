@@ -167,6 +167,35 @@ async def cb_csv(callback: CallbackQuery):
     )
 
 
+@router.message(Command("export_clients"))
+async def cmd_export_clients(message: Message):
+    if message.from_user.id != DESIGNER_TELEGRAM_ID:
+        return
+
+    await message.answer("Генерирую список клиентов…")
+
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT DISTINCT ON (o.telegram_id)
+                      o.name, o.phone, o.service_type, o.region, o.status, o.created_at
+               FROM orders o
+               ORDER BY o.telegram_id, o.created_at DESC"""
+        )
+
+    from services.pdf_generator import generate_clients_pdf
+    from config import DESIGNER_NAME
+
+    clients_data = [dict(r) for r in rows]
+    pdf_bytes = generate_clients_pdf(clients_data, designer_name=DESIGNER_NAME)
+    filename = f"clients_{datetime.now().strftime('%Y-%m-%d')}.pdf"
+
+    await message.answer_document(
+        document=BufferedInputFile(pdf_bytes, filename=filename),
+        caption=f"Клиенты ВашСад\nВсего: {len(clients_data)} чел.",
+        parse_mode="HTML",
+    )
+
+
 def _build_favorites_pdf(rows) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors

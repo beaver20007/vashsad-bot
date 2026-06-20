@@ -16,6 +16,7 @@ from config import (
 )
 from keyboards import main_menu_keyboard, back_to_menu_keyboard
 from services.database import get_or_create_user, insert_analytics_event
+from services.i18n import t
 
 SCREEN_LINKS = {
     'screen_garden': ('🏡 Мой сад', 'garden'),
@@ -111,6 +112,7 @@ async def cmd_start(message: Message, state: FSMContext):
         message.from_user.id,
         username=message.from_user.username,
         first_name=message.from_user.first_name,
+        language_code=message.from_user.language_code,
     )
 
     # Deep link / реферальный payload
@@ -200,10 +202,10 @@ async def cmd_start(message: Message, state: FSMContext):
         params={"ab_variant": variant, "is_new_user": is_new_user},
     ))
 
-    name = user.first_name or "друг"
-    caption = f"👋 Привет, {name}!\n\n" + ab_text.format(
-        bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN
-    )
+    name = user.first_name or ("friend" if user.lang == "en" else "друг")
+    greeting = "👋 Hello, {name}!\n\n" if user.lang == "en" else "👋 Привет, {name}!\n\n"
+    welcome_text = t("welcome", user.lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
+    caption = greeting.format(name=name) + welcome_text
     if WELCOME_IMAGE_URL:
         await message.answer_photo(
             photo=WELCOME_IMAGE_URL,
@@ -218,7 +220,7 @@ async def cmd_start(message: Message, state: FSMContext):
             parse_mode="HTML",
         )
     await message.answer(
-        "Используйте кнопки быстрого доступа 👇",
+        t("menu_hint", user.lang),
         reply_markup=MAIN_KEYBOARD,
     )
 
@@ -362,3 +364,62 @@ async def quick_book(message: Message, state: FSMContext):
 async def quick_profile(message: Message):
     from handlers.price import cmd_profile
     await cmd_profile(message)
+
+
+# ── /callback — запрос обратного звонка ──────────────────────────────────────
+
+from aiogram.fsm.state import State, StatesGroup
+
+
+class CallbackForm(StatesGroup):
+    waiting_phone = State()
+
+
+@router.message(Command("callback"))
+async def cmd_callback(message: Message, state: FSMContext):
+    await message.answer(
+        "📞 <b>Обратный звонок</b>\n\n"
+        "Введите ваш номер телефона, и дизайнер свяжется с вами в течение дня:\n\n"
+        "<i>Пример: +7 (999) 123-45-67</i>",
+        parse_mode="HTML",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(CallbackForm.waiting_phone)
+
+
+@router.message(CallbackForm.waiting_phone)
+async def process_callback_phone(message: Message, state: FSMContext):
+    phone = message.text.strip() if message.text else ""
+    await state.clear()
+
+    # Notify designer
+    import os
+    import aiohttp
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    designer_id = os.getenv("DESIGNER_TELEGRAM_ID")
+    name = message.from_user.first_name or "Пользователь"
+    username = f" (@{message.from_user.username})" if message.from_user.username else ""
+
+    if bot_token and designer_id:
+        text = (
+            f"📞 Новый запрос на звонок!\n"
+            f"Имя: {name}{username}\n"
+            f"Телефон: {phone}\n"
+            f"Удобное время: Любое время"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": designer_id, "text": text},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                )
+        except Exception:
+            pass
+
+    await message.answer(
+        "✅ <b>Запрос отправлен!</b>\n\n"
+        f"Дизайнер получил ваш номер <b>{phone}</b> и свяжется с вами в течение дня 🌿",
+        parse_mode="HTML",
+        reply_markup=MAIN_KEYBOARD,
+    )
