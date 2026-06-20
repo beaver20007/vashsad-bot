@@ -240,123 +240,6 @@ vashsad-full/
 
 ## Деплой на VPS
 
-Пошаговая инструкция для деплоя на чистый Ubuntu 22.04 VPS.
-
-### 1. Требования
-
-- Ubuntu 22.04 LTS
-- Docker 24+ и Docker Compose v2 (`docker compose`)
-- Домен (обязателен, если хочешь получать YooKassa webhook по HTTPS)
-- Открытые порты: 80, 443 (для webhook), 22 (SSH)
-
-```bash
-# Установка Docker на Ubuntu 22.04
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-### 2. Клонирование репозитория
-
-```bash
-git clone https://github.com/Beaver20007/vashsad-full.git
-cd vashsad-full
-```
-
-### 3. Создание файла окружения
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Обязательные переменные для production:
-
-| Переменная | Описание |
-|-----------|---------|
-| `TELEGRAM_BOT_TOKEN` | Токен бота от @BotFather |
-| `ANTHROPIC_API_KEY` | API-ключ Anthropic (`sk-ant-...`) |
-| `DATABASE_URL` | PostgreSQL строка подключения |
-| `REDIS_URL` | Redis URL (`redis://redis:6379/0` для docker-compose) |
-| `DESIGNER_TELEGRAM_ID` | Telegram ID дизайнера для уведомлений |
-| `DESIGNER_NAME` | Имя дизайнера (именительный падеж) |
-| `DESIGNER_NAME_GEN` | Имя дизайнера (родительный падеж) |
-| `YOOKASSA_SHOP_ID` | ID магазина YooKassa (если нужны платежи) |
-| `YOOKASSA_SECRET_KEY` | Секретный ключ YooKassa |
-| `WEBHOOK_URL` | Публичный URL для YooKassa webhook (опционально) |
-| `MINI_APP_URL` | URL Mini App на Vercel (для кнопки WebApp) |
-| `BOT_USERNAME` | Username бота без `@` |
-| `ADMIN_TOKEN` | Секрет для дашборда `/admin` |
-
-### 4. Запуск
-
-```bash
-docker compose up -d --build
-```
-
-Бот и Redis поднимутся в контейнерах. PostgreSQL берётся из внешнего `DATABASE_URL` (Neon или собственный Postgres).
-
-### 5. Проверка перед запуском
-
-```bash
-python scripts/pre_deploy_check.py
-```
-
-Скрипт проверит наличие всех обязательных переменных и доступность сервисов.
-
-### 6. Настройка BotFather
-
-После первого запуска выполни один раз:
-
-```bash
-python setup_bot.py
-```
-
-Скрипт установит имя, описание, фото профиля и список команд бота через Bot API.
-
-### 7. Webhook для YooKassa (опционально)
-
-Для получения уведомлений об оплате через YooKassa:
-
-1. Укажи в `.env`:
-   ```
-   WEBHOOK_URL=https://yourdomain.com/webhook/yookassa
-   YOOKASSA_WEBHOOK_ENABLED=1
-   ```
-2. Настрой обратный прокси (nginx / Caddy) для HTTPS на порт `8080` (webhook-сервер бота).
-3. Перезапусти бот: `docker compose restart bot`
-
-### 8. Мониторинг и логи
-
-```bash
-# Следить за логами бота в реальном времени
-docker compose logs -f bot
-
-# Статус контейнеров
-docker compose ps
-
-# Перезапуск после изменения .env
-docker compose restart bot
-```
-
----
-
-## Secrets для GitHub Actions
-
-При настройке CI/CD через `.github/workflows/` добавь в Settings → Secrets → Actions следующие секреты:
-
-| Secret | Описание |
-|--------|---------|
-| `DOCKER_USERNAME` | Логин Docker Hub (для пуша образа) |
-| `DOCKER_PASSWORD` | Пароль / Access Token Docker Hub |
-| `VPS_HOST` | IP-адрес или домен VPS сервера |
-| `VPS_USER` | SSH-пользователь на VPS (например, `ubuntu`) |
-| `VPS_KEY` | Приватный SSH-ключ для доступа к VPS (содержимое `~/.ssh/id_rsa`) |
-
----
-
-## Деплой на VPS
-
 ### Требования
 - Ubuntu 22.04 LTS
 - Docker + Docker Compose v2
@@ -435,6 +318,20 @@ curl https://YOUR_DOMAIN/api/health
 
 Push в main → GitHub Actions автоматически деплоит.
 Ручное обновление: `bash scripts/deploy.sh`
+
+---
+
+## Secrets для GitHub Actions
+
+При настройке CI/CD через `.github/workflows/` добавь в Settings → Secrets → Actions следующие секреты:
+
+| Secret | Описание |
+|--------|---------|
+| `DOCKER_USERNAME` | Логин Docker Hub (для пуша образа) |
+| `DOCKER_PASSWORD` | Пароль / Access Token Docker Hub |
+| `VPS_HOST` | IP-адрес или домен VPS сервера |
+| `VPS_USER` | SSH-пользователь на VPS (например, `ubuntu`) |
+| `VPS_KEY` | Приватный SSH-ключ для доступа к VPS (содержимое `~/.ssh/id_rsa`) |
 
 ---
 
