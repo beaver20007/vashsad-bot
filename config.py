@@ -29,6 +29,10 @@ BOT_NAME = "ВашСад Бот"
 # ── YooKassa ────────────────────────────────
 YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID", "")
 YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY", "")
+YOOKASSA_RETURN_URL = os.getenv("YOOKASSA_RETURN_URL", "https://t.me/vashsad_bot")
+
+# ── Бот ─────────────────────────────────────
+BOT_USERNAME = os.getenv("BOT_USERNAME", "vashsad_bot")
 
 # ── Прайс-лист ──────────────────────────────
 SERVICES = {
@@ -76,3 +80,7 @@ SERVICES = {
     },
 }
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad.vercel.app")
+WELCOME_IMAGE_URL = os.getenv("WELCOME_IMAGE_URL", "")
+
+# ── Sentry ───────────────────────────────────
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")

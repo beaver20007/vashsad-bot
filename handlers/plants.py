@@ -10,7 +10,7 @@ from keyboards import (
     plants_region_keyboard, plants_type_keyboard,
     back_to_menu_keyboard, subscribe_keyboard, cancel_keyboard, plan_result_keyboard
 )
-from services.storage import get_or_create_user, can_use_plants, update_user
+from services.database import get_or_create_user, can_use_plants, update_user
 from services.ai import select_plants
 
 router = Router()
@@ -52,7 +52,7 @@ async def cb_plants(callback: CallbackQuery, state: FSMContext):
 
 
 async def _start_plants_flow(message: Message, state: FSMContext, edit: bool = False):
-    user = get_or_create_user(message.chat.id)
+    user = await get_or_create_user(message.chat.id)
 
     if not can_use_plants(user, FREE_PLANTS_LIMIT):
         text = (
@@ -127,10 +127,10 @@ async def cb_light(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
     # Проверяем лимит и обновляем счётчик
-    user = get_or_create_user(callback.from_user.id)
+    user = await get_or_create_user(callback.from_user.id)
     if not user.is_subscribed:
         user.plants_count += 1
-        update_user(user)
+        await update_user(user)
 
     await callback.message.edit_text(
         "🔍 <b>Подбираю растения для вас...</b>\n\n"

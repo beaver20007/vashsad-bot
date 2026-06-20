@@ -1,0 +1,14 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+docs/
+max-integration/
+venv/
+.venv/
+*.md
+tests/
+.pytest_cache/

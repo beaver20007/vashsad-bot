@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery, PhotoSize
 
 from config import FREE_PHOTO_LIMIT
 from keyboards import back_to_menu_keyboard, subscribe_keyboard, cancel_keyboard
-from services.database import get_or_create_user, can_use_photo, update_user, save_diagnosis
+from services.database import get_or_create_user, can_use_photo, update_user, save_diagnosis, get_user_diagnoses
 from services.ai import ask_claude_with_image
 
 router = Router()
@@ -20,6 +20,24 @@ PHOTO_PROMPT_TEXT = (
     "Чем чётче фото — тем точнее диагноз 🔍\n\n"
     "<i>Просто отправьте фото в этот чат ↓</i>"
 )
+
+
+@router.message(Command("history"))
+async def cmd_history(message: Message):
+    diagnoses = await get_user_diagnoses(message.from_user.id)
+    if not diagnoses:
+        await message.answer(
+            "📋 У вас пока нет сохранённых диагностик.",
+            reply_markup=back_to_menu_keyboard(),
+        )
+        return
+    lines = []
+    for d in diagnoses[:5]:
+        date_str = d.created_at.strftime("%d.%m.%Y") if d.created_at else "—"
+        snippet = (d.result[:100] + "...") if d.result and len(d.result) > 100 else (d.result or "")
+        lines.append(f"📸 {date_str} — {snippet}")
+    text = "<b>Последние диагностики:</b>\n\n" + "\n\n".join(lines)
+    await message.answer(text, parse_mode="HTML", reply_markup=back_to_menu_keyboard())
 
 
 @router.message(Command("photo"))

@@ -1,0 +1,1 @@
+# MAX Integration — core package

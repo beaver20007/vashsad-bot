@@ -3,92 +3,69 @@
 
 ---
 
+## ✅ ВЫПОЛНЕНО
+
+### TASK-001: PostgreSQL-хранилище ✅
+- `services/database.py` — полная реализация с asyncpg + Neon PostgreSQL
+- Таблицы: users, chat_history, orders, diagnoses, user_plants, favorites, garden_tasks
+- `handlers/chat.py`, `handlers/plants.py`, `handlers/order.py` — переведены с in-memory на async DB
+
+### TASK-002: FSM-диалог /plan ✅
+- `handlers/plan.py` — 5 шагов FSM (площадь → форма → стороны света → что есть → пожелания)
+- Claude AI генерирует текстовый план участка
+
+### TASK-005: Профиль пользователя (/profile) ✅
+- Добавлен в `handlers/start.py`
+- Показывает: имя, статус подписки, дата регистрации, остаток лимитов
+
+### TASK-011: PostgreSQL ✅ (было в плане как Этап 1)
+- Уже используется с asyncpg через Neon (serverless PostgreSQL)
+
+### TASK-012: Telegram Mini App ✅ (было в плане как Этап 3)
+- `C:/Projects/vashsad-miniapp` — Next.js 15, задеплоен на Vercel
+- Экраны: Garden, Plants (избранное), Diagnosis (Claude Vision), Orders, Profile
+
+---
+
 ## 🔴 ВЫСОКИЙ ПРИОРИТЕТ (делать сейчас)
 
-### TASK-001: Заменить in-memory storage на SQLite
-**Файлы:** `services/storage.py`, новый `services/database.py`
-**Описание:**
-- Создать `services/database.py` с init_db() и функциями CRUD
-- Переписать `services/storage.py` чтобы использовал SQLite
-- Схема: таблицы users, chat_history, orders (см. docs/02_Architecture.md)
-- Данные должны сохраняться между рестартами бота
-
-**Критерии готовности:**
-- Перезапуск бота не сбрасывает счётчики пользователей
-- Заявки сохраняются в orders таблице
-- get_or_create_user() работает через SQLite
-
----
-
-### TASK-002: FSM-диалог генерации плана участка (/plan)
-**Файлы:** новый `handlers/plan.py`, `keyboards.py`, `bot.py`
-**Описание:**
-- Команда /plan запускает FSM-диалог
-- Шаги: площадь → форма (прямоугольник/Г-образный/неправильный) →
-  стороны света (где север) → что уже есть (дом/баня/деревья) →
-  пожелания (зона отдыха/огород/цветники)
-- После сбора параметров → Claude AI генерирует текстовый план
-- Кнопка «Хочу детальный проект» → /order
-
-**Промпт для AI:**
-```
-Создай текстовый план участка для природного сада:
-Площадь: {area}
-Форма: {shape}
-Регион: Нижегородская/Владимирская область
-Существующие объекты: {existing}
-Пожелания: {wishes}
-
-Опиши: 1) Зонирование 2) Рекомендуемые растения 3) С чего начать
-Стиль: природный, минимальный уход, аборигенные виды.
-```
-
----
-
 ### TASK-003: Подключить welcome-картинку в /start
-**Файлы:** `handlers/start.py`
+**Файлы:** `handlers/start.py`, `.env`
 **Описание:**
-- Сохранить file_id картинки маскота (отправить боту → получить file_id)
-- В cmd_start() отправить `answer_photo(photo=FILE_ID, caption=WELCOME_TEXT)`
-- Кнопки оставить прежними
+- Отправить боту фото маскота → получить `file_id` из ответа
+- Добавить в `.env`: `WELCOME_IMAGE_URL=<file_id>`
+- Логика уже готова в `cmd_start()` — проверяет `WELCOME_IMAGE_URL`
 
 ---
 
-### TASK-004: Настройка деплоя на VPS
-**Файлы:** `Dockerfile`, `requirements.txt`, `.github/workflows/deploy.yml`
+### TASK-004: Деплой на VPS ✅ ЧАСТИЧНО
+**Файлы:** `Dockerfile` ✅, `requirements.txt` ✅, `.env` (нужно заполнить на VPS)
 **Описание:**
-- Создать `requirements.txt` с зафиксированными версиями
-- Создать `Dockerfile`
-- Написать инструкцию деплоя (уже есть в docs/05_Deploy.md)
-- Настроить systemd unit (шаблон в docs/05_Deploy.md)
+- `Dockerfile` создан (python:3.12-slim + asyncpg deps)
+- `requirements.txt` обновлён (добавлен `anthropic>=0.28.0`)
+- Осталось:
+  - Арендовать VPS (Timeweb/Beget/Selectel)
+  - Скопировать `.env` с реальными ключами
+  - `docker build -t vashsad-bot . && docker run -d --env-file .env vashsad-bot`
+  - Или использовать systemd (инструкция в `docs/05_Deploy.md`)
 
 ---
 
 ## 🟡 СРЕДНИЙ ПРИОРИТЕТ (Этап 1)
 
-### TASK-005: Профиль пользователя (/profile)
-**Файлы:** новый `handlers/profile.py`, `keyboards.py`, `bot.py`
-**Описание:**
-- /profile показывает: имя, регион, дата регистрации
-- Остаток лимитов: AI x/10, Фото x/3, Подбор x/3
-- Кнопка «Изменить регион»
-- Кнопка «Мои заявки» (список последних 5 заявок)
-
----
-
 ### TASK-006: Реферальная программа
 **Файлы:** `handlers/start.py`, `services/database.py`
 **Описание:**
-- /start?start=REF_CODE — отслеживать реферала
+- `/start?start=REF_CODE` — отслеживать реферала
 - При регистрации через реферала — +3 бонусных сообщения рефереру
-- /referral — получить свою реферальную ссылку
+- `/referral` — получить свою реферальную ссылку
 
 ---
 
 ### TASK-007: Портфолио с фото (/portfolio)
-**Файлы:** `handlers/start.py` (команда /portfolio уже есть)
+**Файлы:** `handlers/start.py` (команда `/portfolio` уже есть — редиректит в Mini App)
 **Описание:**
-- Создать список проектов в config.py (name, description, photo_file_id)
+- Создать список проектов в `config.py` (name, description, photo_file_id)
 - Отправлять медиагруппу с фото и подписями
 - Кнопка «Хочу такой проект» → /order
 
@@ -111,23 +88,16 @@
 - Webhook для подтверждения оплаты
 
 ### TASK-010: Redis FSM Storage
-- Заменить MemoryStorage на RedisStorage
-- Данные FSM переживают рестарт бота
-
-### TASK-011: PostgreSQL
-- Заменить SQLite на PostgreSQL
-- Alembic для миграций
-
-### TASK-012: Telegram Mini App
-- Веб-интерфейс для портфолио и заявок
-- React + Telegram Web App SDK
+- Уже используется Upstash Redis в miniapp
+- Для бота: заменить `MemoryStorage` на `RedisStorage` (aiogram-redis)
+- FSM-данные переживают рестарт бота
 
 ---
 
 ## Как работать с этим файлом в Claude Code
 
 ```
-Открой задачу TASK-001 из docs/00_Backlog.md и реализуй её.
+Открой задачу TASK-004 из docs/00_Backlog.md и реализуй её.
 Все детали архитектуры в docs/02_Architecture.md.
 После выполнения запиши summary в 03-Daily/YYYY-MM-DD.md.
 ```

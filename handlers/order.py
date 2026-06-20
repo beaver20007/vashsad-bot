@@ -4,7 +4,10 @@ import os
 import asyncio
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import (
+    Message, CallbackQuery,
+    KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
+)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -15,12 +18,26 @@ from keyboards import (
     services_keyboard, order_confirm_keyboard,
     back_to_menu_keyboard, cancel_keyboard,
 )
-from services.database import get_or_create_user, save_order  # ← БД
+from services.database import get_or_create_user, save_order, insert_analytics_event  # ← БД
 from services.email_service import notify_email_new_order, notify_email_new_project
 from services.sms_service import notify_sms_new_order, notify_sms_new_project
 
 router = Router()
 log = logging.getLogger(__name__)
+
+FOREIGN_EMAIL_DOMAINS = {
+    "gmail.com", "yahoo.com", "hotmail.com",
+    "outlook.com", "icloud.com", "live.com",
+    "mail.com", "ymail.com",
+}
+
+
+def is_foreign_email(text: str) -> bool:
+    """True если домен email входит в список запрещённых иностранных провайдеров."""
+    if "@" not in text:
+        return False
+    domain = text.strip().lower().rsplit("@", 1)[-1]
+    return domain in FOREIGN_EMAIL_DOMAINS
 
 DESIGNER_TELEGRAM_ID_2 = int(os.getenv("DESIGNER_TELEGRAM_ID_2", "0"))
 
@@ -57,14 +74,27 @@ def skip_inline_keyboard():
 
 
 class OrderForm(StatesGroup):
-    contact_phone  = State()
-    contact_extra  = State()
-    brief_area     = State()
-    brief_existing = State()
-    brief_style    = State()
-    brief_wishes   = State()
-    brief_phone    = State()
-    brief_extra    = State()
+    contact_phone    = State()
+    contact_extra    = State()
+    contact_location = State()
+    brief_area       = State()
+    brief_existing   = State()
+    brief_style      = State()
+    brief_wishes     = State()
+    brief_phone      = State()
+    brief_extra      = State()
+    brief_location   = State()
+
+
+def location_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[[
+            KeyboardButton(text="📍 Отправить местоположение", request_location=True),
+            KeyboardButton(text="⏭ Пропустить"),
+        ]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
 
 
 STYLE_KB_TEXT = {
@@ -85,7 +115,9 @@ PHONE_PROMPT = (
 )
 
 EMAIL_PROMPT = (
-    "📧 <b>Email</b>\n\nВведите email или нажмите «Пропустить»."
+    "📧 <b>Email</b>\n\nВведите email или нажмите «Пропустить».\n\n"
+    "<i>Принимаются только российские почтовые сервисы "
+    "(yandex.ru, mail.ru и др.).</i>"
 )
 
 
@@ -167,17 +199,62 @@ async def contact_phone(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "skip_extra", OrderForm.contact_extra)
 async def skip_contact_extra(callback: CallbackQuery, state: FSMContext):
-    await _finish_contact(callback.message, state, email="не указан",
-                          user=callback.from_user, edit=True)
+    await state.update_data(email="не указан")
+    await state.set_state(OrderForm.contact_location)
+    await callback.message.edit_text(
+        "📍 <b>Местоположение участка</b> (необязательно)\n\n"
+        "Это поможет дизайнеру точнее рассчитать логистику:",
+        parse_mode="HTML",
+    )
+    await callback.message.answer(
+        "Отправьте геолокацию или нажмите «Пропустить»:",
+        reply_markup=location_keyboard(),
+    )
     await callback.answer()
 
 
 @router.message(OrderForm.contact_extra)
 async def contact_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
+    if is_foreign_email(email):
+        await message.answer(
+            "⚠️ Почта иностранных сервисов (Gmail, Yahoo, Outlook, iCloud и др.) "
+            "не принимается.\n\nВведите адрес на российском сервисе "
+            "(yandex.ru, mail.ru и др.) или нажмите «Пропустить».",
+            reply_markup=skip_inline_keyboard(),
+        )
+        return
     try: await message.delete()
     except Exception: pass
-    await _finish_contact(message, state, email=email, user=message.from_user)
+    await state.update_data(email=email)
+    await state.set_state(OrderForm.contact_location)
+    await message.answer(
+        "📍 <b>Местоположение участка</b> (необязательно)\n\n"
+        "Это поможет дизайнеру точнее рассчитать логистику.\n\n"
+        "Отправьте геолокацию или нажмите «Пропустить»:",
+        parse_mode="HTML",
+        reply_markup=location_keyboard(),
+    )
+
+
+@router.message(OrderForm.contact_location, F.location)
+async def contact_location_received(message: Message, state: FSMContext):
+    loc = message.location
+    await state.update_data(location=f"{loc.latitude:.5f}, {loc.longitude:.5f}")
+    await message.answer("✅ Геолокация сохранена!", reply_markup=ReplyKeyboardRemove())
+    data = await state.get_data()
+    await _finish_contact(message, state,
+                          email=data.get("email", "не указан"),
+                          user=message.from_user)
+
+
+@router.message(OrderForm.contact_location, F.text == "⏭ Пропустить")
+async def contact_location_skip(message: Message, state: FSMContext):
+    await message.answer("Продолжаем…", reply_markup=ReplyKeyboardRemove())
+    data = await state.get_data()
+    await _finish_contact(message, state,
+                          email=data.get("email", "не указан"),
+                          user=message.from_user)
 
 
 async def _finish_contact(message, state, email, user, edit=False):
@@ -188,6 +265,7 @@ async def _finish_contact(message, state, email, user, edit=False):
     svc_price = data.get("service_price", 0)
     price_str = f"{svc_price:,} ₽".replace(",", " ")
     phone     = data.get("phone", "не указан")
+    location  = data.get("location", "")
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
     dt        = message.date.strftime("%d.%m.%Y %H:%M")
 
@@ -199,15 +277,25 @@ async def _finish_contact(message, state, email, user, edit=False):
         service_price=svc_price,
         phone=phone,
         email=email,
+        location=location or None,
     )
 
+    # A/B конверсия
+    ab_variant = "A" if user.id % 2 == 0 else "B"
+    await insert_analytics_event(
+        telegram_id=user.id,
+        event_name="order_placed",
+        params={"ab_variant": ab_variant, "service_type": "service"},
+    )
+
+    loc_line = f"\n📍 Геолокация: {location}" if location else ""
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА — ВашСад Бот</b>\n\n"
         f"👤 Клиент: {user_info}\n"
         f"📋 Услуга: {svc_name}\n"
         f"💰 Сумма: {price_str}\n"
         f"📱 Телефон: {phone}\n"
-        f"📧 Email: {email}\n\n"
+        f"📧 Email: {email}{loc_line}\n\n"
         f"⏰ {dt}"
     )
     await asyncio.gather(
@@ -327,17 +415,62 @@ async def brief_phone(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "skip_extra", OrderForm.brief_extra)
 async def skip_brief_extra(callback: CallbackQuery, state: FSMContext):
-    await _finish_brief(callback.message, state, email="не указан",
-                        user=callback.from_user, edit=True)
+    await state.update_data(email="не указан")
+    await state.set_state(OrderForm.brief_location)
+    await callback.message.edit_text(
+        "📍 <b>Местоположение участка</b> (необязательно)\n\n"
+        "Это поможет дизайнеру точнее рассчитать логистику:",
+        parse_mode="HTML",
+    )
+    await callback.message.answer(
+        "Отправьте геолокацию или нажмите «Пропустить»:",
+        reply_markup=location_keyboard(),
+    )
     await callback.answer()
 
 
 @router.message(OrderForm.brief_extra)
 async def brief_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
+    if is_foreign_email(email):
+        await message.answer(
+            "⚠️ Почта иностранных сервисов (Gmail, Yahoo, Outlook, iCloud и др.) "
+            "не принимается.\n\nВведите адрес на российском сервисе "
+            "(yandex.ru, mail.ru и др.) или нажмите «Пропустить».",
+            reply_markup=skip_inline_keyboard(),
+        )
+        return
     try: await message.delete()
     except Exception: pass
-    await _finish_brief(message, state, email=email, user=message.from_user)
+    await state.update_data(email=email)
+    await state.set_state(OrderForm.brief_location)
+    await message.answer(
+        "📍 <b>Местоположение участка</b> (необязательно)\n\n"
+        "Это поможет дизайнеру точнее рассчитать логистику.\n\n"
+        "Отправьте геолокацию или нажмите «Пропустить»:",
+        parse_mode="HTML",
+        reply_markup=location_keyboard(),
+    )
+
+
+@router.message(OrderForm.brief_location, F.location)
+async def brief_location_received(message: Message, state: FSMContext):
+    loc = message.location
+    await state.update_data(location=f"{loc.latitude:.5f}, {loc.longitude:.5f}")
+    await message.answer("✅ Геолокация сохранена!", reply_markup=ReplyKeyboardRemove())
+    data = await state.get_data()
+    await _finish_brief(message, state,
+                        email=data.get("email", "не указан"),
+                        user=message.from_user)
+
+
+@router.message(OrderForm.brief_location, F.text == "⏭ Пропустить")
+async def brief_location_skip(message: Message, state: FSMContext):
+    await message.answer("Продолжаем…", reply_markup=ReplyKeyboardRemove())
+    data = await state.get_data()
+    await _finish_brief(message, state,
+                        email=data.get("email", "не указан"),
+                        user=message.from_user)
 
 
 async def _finish_brief(message, state, email, user, edit=False):
@@ -346,6 +479,7 @@ async def _finish_brief(message, state, email, user, edit=False):
 
     user_info = f"{user.full_name} (@{user.username or 'нет'})"
     phone     = data.get("phone", "не указан")
+    location  = data.get("location", "")
     dt        = message.date.strftime("%d.%m.%Y %H:%M")
 
     # ── Сохраняем в БД ──
@@ -358,8 +492,18 @@ async def _finish_brief(message, state, email, user, edit=False):
         wishes=data.get("wishes"),
         phone=phone,
         email=email,
+        location=location or None,
     )
 
+    # A/B конверсия
+    ab_variant = "A" if user.id % 2 == 0 else "B"
+    await insert_analytics_event(
+        telegram_id=user.id,
+        event_name="order_placed",
+        params={"ab_variant": ab_variant, "service_type": "project"},
+    )
+
+    loc_line = f"\n📍 Геолокация: {location}" if location else ""
     designer_msg = (
         f"🌿 <b>НОВАЯ ЗАЯВКА НА ПРОЕКТ — ВашСад Бот</b>\n\n"
         f"👤 Клиент: {user_info}\n"
@@ -368,7 +512,7 @@ async def _finish_brief(message, state, email, user, edit=False):
         f"🎨 Стиль: {data.get('style', '?')}\n"
         f"💬 Пожелания: {data.get('wishes', '?')}\n"
         f"📱 Телефон: {phone}\n"
-        f"📧 Email: {email}\n\n"
+        f"📧 Email: {email}{loc_line}\n\n"
         f"⏰ {dt}"
     )
     await asyncio.gather(
