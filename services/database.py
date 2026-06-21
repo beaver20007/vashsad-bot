@@ -56,7 +56,7 @@ async def _create_tables() -> None:
             chat_count    INTEGER DEFAULT 0,
             photo_count   INTEGER DEFAULT 0,
             plants_count  INTEGER DEFAULT 0,
-            plot_size     FLOAT,
+            garden_area   FLOAT,
             created_at    TIMESTAMP DEFAULT NOW(),
             updated_at    TIMESTAMP DEFAULT NOW()
         );
@@ -193,8 +193,26 @@ async def _create_tables() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT REFERENCES users(telegram_id)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_messages INTEGER DEFAULT 0",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS lang VARCHAR(5) DEFAULT 'ru'",
+            # Совместимость с miniapp (vashsad-miniapp-pi.vercel.app)
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_area FLOAT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_style TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS push_subscription JSONB",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_photo_url TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS season_plan TEXT",
         ]:
             await conn.execute(col_sql)
+        # Переименовываем plot_size → garden_area если колонка ещё старая
+        await conn.execute("""
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='plot_size'
+                ) THEN
+                    ALTER TABLE users RENAME COLUMN plot_size TO garden_area;
+                END IF;
+            END $$;
+        """)
     log.info("✅ Таблицы созданы / проверены")
 
 
@@ -212,7 +230,7 @@ class User:
     chat_count: int = 0
     photo_count: int = 0
     plants_count: int = 0
-    plot_size: Optional[float] = None
+    garden_area: Optional[float] = None
     chat_history: list = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     subscription_expires_at: Optional[datetime] = None
@@ -277,7 +295,7 @@ async def get_or_create_user(
         chat_count=row["chat_count"],
         photo_count=row["photo_count"],
         plants_count=row["plants_count"],
-        plot_size=row["plot_size"],
+        garden_area=row.get("garden_area") or row.get("plot_size"),
         chat_history=chat_history,
         created_at=row["created_at"],
         subscription_expires_at=row.get("subscription_expires_at"),
@@ -300,11 +318,11 @@ async def update_user(user: User) -> None:
             """UPDATE users SET
                username=$1, first_name=$2, region=$3,
                is_subscribed=$4, chat_count=$5, photo_count=$6,
-               plants_count=$7, plot_size=$8, updated_at=NOW()
+               plants_count=$7, garden_area=$8, updated_at=NOW()
                WHERE telegram_id=$9""",
             user.username, user.first_name, user.region,
             user.is_subscribed, user.chat_count, user.photo_count,
-            user.plants_count, user.plot_size, user.telegram_id,
+            user.plants_count, user.garden_area, user.telegram_id,
         )
 
 
@@ -414,6 +432,52 @@ async def get_user_diagnoses(telegram_id: int, limit: int = 10) -> list:
 # ══════════════════════════════════════════════════════════════
 #  MY GARDEN — растения пользователя
 # ══════════════════════════════════════════════════════════════
+
+async def search_plants(query: str = "", category: str = "", limit: int = 20) -> list:
+    """Поиск растений из общей таблицы miniapp (схема: name_ru, name_latin, tags, light, height_m)."""
+    async with _pool.acquire() as conn:
+        try:
+            if query and category:
+                rows = await conn.fetch(
+                    """SELECT id, slug, name_ru, name_latin, category, description,
+                              photo_url, light, height_m, tags
+                       FROM plants
+                       WHERE category = $1
+                         AND (name_ru ILIKE $2 OR name_latin ILIKE $2 OR description ILIKE $2)
+                       ORDER BY is_featured DESC NULLS LAST, name_ru
+                       LIMIT $3""",
+                    category, f"%{query}%", limit,
+                )
+            elif query:
+                rows = await conn.fetch(
+                    """SELECT id, slug, name_ru, name_latin, category, description,
+                              photo_url, light, height_m, tags
+                       FROM plants
+                       WHERE name_ru ILIKE $1 OR name_latin ILIKE $1 OR description ILIKE $1
+                       ORDER BY is_featured DESC NULLS LAST, name_ru
+                       LIMIT $2""",
+                    f"%{query}%", limit,
+                )
+            elif category:
+                rows = await conn.fetch(
+                    """SELECT id, slug, name_ru, name_latin, category, description,
+                              photo_url, light, height_m, tags
+                       FROM plants WHERE category = $1
+                       ORDER BY is_featured DESC NULLS LAST, name_ru LIMIT $2""",
+                    category, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """SELECT id, slug, name_ru, name_latin, category, description,
+                              photo_url, light, height_m, tags
+                       FROM plants
+                       ORDER BY is_featured DESC NULLS LAST, name_ru LIMIT $1""",
+                    limit,
+                )
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
+
 
 async def get_user_plants(telegram_id: int) -> list:
     async with _pool.acquire() as conn:
