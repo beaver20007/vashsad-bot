@@ -85,6 +85,9 @@ async def _create_tables() -> None:
             wishes       TEXT,
             phone        VARCHAR(32),
             email        VARCHAR(128),
+            name         VARCHAR(128),
+            region       VARCHAR(128),
+            budget_range VARCHAR(64),
             status       VARCHAR(32) DEFAULT 'new',
             created_at   TIMESTAMP DEFAULT NOW()
         );
@@ -194,6 +197,9 @@ async def _create_tables() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_messages INTEGER DEFAULT 0",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS lang VARCHAR(5) DEFAULT 'ru'",
             # Совместимость с miniapp (vashsad-miniapp-pi.vercel.app)
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS name VARCHAR(128)",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS region VARCHAR(128)",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS budget_range VARCHAR(64)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_area FLOAT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_style TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE",
@@ -386,17 +392,31 @@ async def save_order(
     wishes: str = None,
     phone: str = None,
     email: str = None,
+    name: str = None,
+    region: str = None,
+    budget_range: str = None,
+    location: str = None,
 ) -> int:
     """Сохранить заявку. Возвращает ID заказа."""
     async with _pool.acquire() as conn:
+        # Если name/region не переданы явно — берём из профиля пользователя
+        if not name or not region:
+            user_row = await conn.fetchrow(
+                "SELECT first_name, region FROM users WHERE telegram_id=$1", telegram_id
+            )
+            if user_row:
+                name = name or user_row["first_name"]
+                region = region or user_row["region"]
         row = await conn.fetchrow(
             """INSERT INTO orders
                (telegram_id, service_type, service_name, service_price,
-                area, existing, style, wishes, phone, email)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                area, existing, style, wishes, phone, email,
+                name, region, budget_range)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
                RETURNING id""",
             telegram_id, service_type, service_name, service_price,
             area, existing, style, wishes, phone, email,
+            name, region, budget_range,
         )
     return row["id"]
 
