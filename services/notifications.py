@@ -11,6 +11,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
+from config import get_designer_ids
 from services.database import get_all_user_ids, log_notification
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,22 @@ _SEASONAL_TIPS: dict[str, str] = {
         "Воспользуйтесь ВашСадом — добавляйте растения в каталог и стройте планы!"
     ),
 }
+
+
+async def notify_designer(bot: Bot, text: str, parse_mode: str = "HTML", **kwargs) -> None:
+    """
+    Отправляет сообщение всем дизайнерам (DESIGNER_TELEGRAM_ID + DESIGNER_TELEGRAM_ID_2).
+
+    :param bot: экземпляр Bot
+    :param text: текст сообщения
+    :param parse_mode: режим разметки (по умолчанию HTML)
+    :param kwargs: дополнительные параметры для bot.send_message
+    """
+    for designer_id in get_designer_ids():
+        try:
+            await bot.send_message(designer_id, text, parse_mode=parse_mode, **kwargs)
+        except Exception as exc:
+            log.warning("notify_designer: не удалось отправить дизайнеру %s: %s", designer_id, exc)
 
 
 async def send_batch(

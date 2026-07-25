@@ -1,9 +1,9 @@
 """Ежемесячный опрос: растение сезона."""
 import logging
-import os
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, PollAnswer
+from config import get_designer_ids
 from services.scheduler import _scheduler_instance
 
 router = Router()
@@ -52,8 +52,7 @@ async def send_monthly_poll(bot):
 
 @router.message(Command("send_poll"))
 async def cmd_send_poll(message: Message):
-    designer_id = int(os.getenv("DESIGNER_TELEGRAM_ID", "0"))
-    if message.from_user.id != designer_id:
+    if message.from_user.id not in get_designer_ids():
         return
     await message.answer("📊 Запускаю опрос...")
     await send_monthly_poll(message.bot)
@@ -61,8 +60,7 @@ async def cmd_send_poll(message: Message):
 
 @router.message(Command("poll_results"))
 async def cmd_poll_results(message: Message):
-    designer_id = int(os.getenv("DESIGNER_TELEGRAM_ID", "0"))
-    if message.from_user.id != designer_id:
+    if message.from_user.id not in get_designer_ids():
         return
     try:
         from services.database import get_pool

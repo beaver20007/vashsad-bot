@@ -146,7 +146,6 @@ async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: "datetime"
 async def schedule_nps(bot: Bot, telegram_id: int, order_id: int) -> None:
     """Планирует NPS-опрос через 3 дня после выполнения заявки."""
     from datetime import datetime, timedelta
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
     # Используем глобальный шедулер из setup_scheduler
     run_at = datetime.now() + timedelta(days=3)
@@ -164,6 +163,77 @@ async def schedule_nps(bot: Bot, telegram_id: int, order_id: int) -> None:
 async def _send_nps_job(bot: Bot, telegram_id: int, order_id: int) -> None:
     from handlers.feedback import send_nps_survey
     await send_nps_survey(bot, telegram_id, order_id)
+
+
+async def send_nps_survey(bot: Bot) -> None:
+    """Рассылает NPS-опрос пользователям, разместившим заказ 7+ дней назад и ещё не оценившим."""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from services.database import get_pool
+
+    try:
+        pool = await get_pool()
+    except Exception as e:
+        log.error("send_nps_survey: не удалось получить пул БД: %s", e)
+        return
+
+    try:
+        async with pool.acquire() as conn:
+            # Убедимся, что таблица существует
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS nps_responses (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    order_id INTEGER,
+                    score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 10),
+                    comment TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            rows = await conn.fetch("""
+                SELECT DISTINCT o.telegram_id
+                FROM orders o
+                WHERE o.created_at < NOW() - INTERVAL '7 days'
+                  AND o.telegram_id NOT IN (
+                      SELECT telegram_id FROM nps_responses
+                  )
+            """)
+    except Exception as e:
+        log.error("send_nps_survey: ошибка запроса к БД: %s", e)
+        return
+
+    if not rows:
+        log.info("send_nps_survey: нет пользователей для NPS-опроса")
+        return
+
+    # Клавиатура оценок 1-10, сгруппированная в 2 ряда
+    detractors = [InlineKeyboardButton(text=str(i), callback_data=f"nps_score:{i}") for i in range(1, 7)]
+    passives   = [InlineKeyboardButton(text=str(i), callback_data=f"nps_score:{i}") for i in range(7, 9)]
+    promoters  = [InlineKeyboardButton(text=str(i), callback_data=f"nps_score:{i}") for i in range(9, 11)]
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        detractors,
+        passives + promoters,
+    ])
+
+    text = (
+        "🌿 <b>Как вы оцениваете наш сервис?</b>\n\n"
+        "Вы воспользовались нашими услугами. Насколько вероятно, что вы порекомендуете нас друзьям?\n\n"
+        "<b>1</b> — точно не порекомендую   <b>10</b> — обязательно порекомендую"
+    )
+
+    sent, failed = 0, 0
+    for row in rows:
+        tid = row["telegram_id"]
+        try:
+            await bot.send_message(tid, text, parse_mode="HTML", reply_markup=keyboard)
+            sent += 1
+        except (TelegramForbiddenError, TelegramBadRequest):
+            failed += 1
+        except Exception as e:
+            log.warning("send_nps_survey: ошибка для %s: %s", tid, e)
+            failed += 1
+
+    log.info("send_nps_survey: отправлено %d, ошибок %d", sent, failed)
 
 
 async def schedule_watering_reminder(bot, telegram_id: int, plants: str, time_str: str, frequency: str):
@@ -360,6 +430,62 @@ async def send_newsletter_blast(bot: Bot) -> None:
     log.info("Рассылка newsletter_blast завершена: отправлено %d, ошибок %d", total_sent, total_failed)
 
 
+async def send_daily_digest(bot: Bot) -> None:
+    """Ежедневный дайджест для дизайнера: новые пользователи, заявки, активные чаты."""
+    from services.database import get_pool
+    try:
+        pool = await get_pool()
+    except Exception as e:
+        log.error("send_daily_digest: не удалось получить пул БД: %s", e)
+        return
+
+    try:
+        async with pool.acquire() as conn:
+            new_users = await conn.fetchval(
+                "SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '1 day'"
+            )
+            new_orders = await conn.fetchval(
+                "SELECT COUNT(*) FROM orders WHERE created_at > NOW() - INTERVAL '1 day'"
+            )
+            new_orders_data = await conn.fetch(
+                """SELECT first_name, service_name, phone
+                   FROM orders
+                   WHERE created_at > NOW() - INTERVAL '1 day'
+                   ORDER BY created_at DESC LIMIT 3"""
+            )
+            active_chats = await conn.fetchval(
+                """SELECT COUNT(DISTINCT telegram_id) FROM chat_history
+                   WHERE created_at > NOW() - INTERVAL '1 day'"""
+            )
+    except Exception as e:
+        log.error("send_daily_digest: ошибка запроса к БД: %s", e)
+        return
+
+    orders_lines = ""
+    if new_orders_data:
+        lines = []
+        for o in new_orders_data:
+            name = o.get("first_name") or "—"
+            svc = o.get("service_name") or "—"
+            phone = o.get("phone") or "—"
+            lines.append(f"  • {name} · {svc} · {phone}")
+        orders_lines = "\n" + "\n".join(lines)
+
+    text = (
+        f"📊 <b>Дайджест за сутки</b>\n\n"
+        f"👥 Новых пользователей: {new_users}\n"
+        f"💬 Активных чатов: {active_chats}\n"
+        f"📋 Новых заявок: {new_orders}"
+        f"{orders_lines}"
+    )
+
+    try:
+        await bot.send_message(DESIGNER_TELEGRAM_ID, text, parse_mode="HTML")
+        log.info("send_daily_digest: дайджест отправлен дизайнеру")
+    except Exception as e:
+        log.error("send_daily_digest: не удалось отправить сообщение: %s", e)
+
+
 async def self_ping_check(bot: Bot) -> None:
     """Каждые 10 минут проверяет health-check miniapp и уведомляет дизайнера при сбое."""
     try:
@@ -417,11 +543,25 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
         replace_existing=True,
     )
     scheduler.add_job(
+        send_daily_digest,
+        CronTrigger(hour=9, minute=0, timezone="Europe/Moscow"),
+        args=[bot],
+        id="daily_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         self_ping_check,
         'interval',
         minutes=10,
         args=[bot],
         id='self_ping',
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        send_nps_survey,
+        CronTrigger(day_of_week="mon", hour=12, timezone="Europe/Moscow"),
+        args=[bot],
+        id="nps_weekly",
         replace_existing=True,
     )
     global _scheduler_instance

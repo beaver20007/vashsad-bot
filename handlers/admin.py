@@ -8,7 +8,7 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from config import DESIGNER_TELEGRAM_ID
+from config import DESIGNER_TELEGRAM_ID, get_designer_ids
 from services.database import get_designer_stats, get_ab_stats, update_order_status, _pool
 
 ORDER_STATUSES = {
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 
 def _only_designer(message: Message) -> bool:
-    return message.from_user.id == DESIGNER_TELEGRAM_ID
+    return message.from_user.id in get_designer_ids()
 
 
 @router.message(Command("stats"))
@@ -65,7 +65,7 @@ async def cmd_stats(message: Message):
 
 @router.callback_query(F.data == "admin:recent_orders")
 async def cb_recent_orders(callback: CallbackQuery):
-    if callback.from_user.id != DESIGNER_TELEGRAM_ID:
+    if callback.from_user.id not in get_designer_ids():
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -126,7 +126,7 @@ async def cmd_orders(message: Message):
 
 @router.callback_query(F.data.startswith("admin:order:"))
 async def cb_order_detail(callback: CallbackQuery):
-    if callback.from_user.id != DESIGNER_TELEGRAM_ID:
+    if callback.from_user.id not in get_designer_ids():
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -166,7 +166,7 @@ async def cb_order_detail(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("admin:setstatus:"))
 async def cb_set_status(callback: CallbackQuery, bot: Bot):
-    if callback.from_user.id != DESIGNER_TELEGRAM_ID:
+    if callback.from_user.id not in get_designer_ids():
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -213,7 +213,7 @@ async def cb_set_status(callback: CallbackQuery, bot: Bot):
 
 @router.message(Command("update_order"))
 async def cmd_update_order(message: Message):
-    if message.from_user.id != DESIGNER_TELEGRAM_ID:
+    if message.from_user.id not in get_designer_ids():
         return
     # Usage: /update_order ORDER_ID STATUS
     parts = message.text.split()
@@ -302,7 +302,7 @@ async def cmd_broadcast(message: Message):
 
 @router.callback_query(F.data == "broadcast:confirm")
 async def cb_broadcast_confirm(callback: CallbackQuery):
-    if callback.from_user.id != DESIGNER_TELEGRAM_ID:
+    if callback.from_user.id not in get_designer_ids():
         await callback.answer()
         return
 
@@ -377,7 +377,7 @@ _pending_segments: dict[int, dict] = {}
 
 @router.message(Command("broadcast_segment"))
 async def cmd_broadcast_segment(message: Message):
-    if message.from_user.id != DESIGNER_TELEGRAM_ID:
+    if message.from_user.id not in get_designer_ids():
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -395,9 +395,18 @@ async def cmd_broadcast_segment(message: Message):
     _pending_segments[message.from_user.id] = {'step': 'choose_segment'}
 
 
+@router.message(Command("digest"))
+async def cmd_digest(message: Message):
+    if not _only_designer(message):
+        return
+    await message.answer("⏳ Формирую дайджест...")
+    from services.scheduler import send_daily_digest
+    await send_daily_digest(message.bot)
+
+
 @router.callback_query(F.data.startswith("bseg:"))
 async def cb_segment_chosen(callback: CallbackQuery):
-    if callback.from_user.id != DESIGNER_TELEGRAM_ID:
+    if callback.from_user.id not in get_designer_ids():
         await callback.answer()
         return
 
@@ -423,7 +432,7 @@ async def cb_segment_chosen(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.message(lambda msg: msg.from_user.id == DESIGNER_TELEGRAM_ID and msg.from_user.id in _pending_segments and _pending_segments.get(msg.from_user.id, {}).get('step') == 'await_text')
+@router.message(lambda msg: msg.from_user.id in get_designer_ids() and msg.from_user.id in _pending_segments and _pending_segments.get(msg.from_user.id, {}).get('step') == 'await_text')
 async def receive_segment_text(message: Message):
     data = _pending_segments.get(message.from_user.id, {})
     segment = data.get('segment', 'all')

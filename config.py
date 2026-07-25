@@ -7,6 +7,20 @@ load_dotenv()
 # ── Telegram ────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 DESIGNER_TELEGRAM_ID = int(os.getenv("DESIGNER_TELEGRAM_ID", "0"))
+DESIGNER_TELEGRAM_ID_2 = os.getenv("DESIGNER_TELEGRAM_ID_2", "")
+
+
+def get_designer_ids() -> list[int]:
+    """Возвращает список всех ID дизайнеров как целые числа."""
+    ids: list[int] = []
+    if DESIGNER_TELEGRAM_ID:
+        ids.append(DESIGNER_TELEGRAM_ID)
+    if DESIGNER_TELEGRAM_ID_2:
+        try:
+            ids.append(int(DESIGNER_TELEGRAM_ID_2))
+        except ValueError:
+            pass
+    return ids
 
 # ── Anthropic ───────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
