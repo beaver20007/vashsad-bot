@@ -22,6 +22,20 @@ from services.sms_service import notify_sms_new_order, notify_sms_new_project
 router = Router()
 log = logging.getLogger(__name__)
 
+FOREIGN_EMAIL_DOMAINS = {
+    "gmail.com", "yahoo.com", "hotmail.com",
+    "outlook.com", "icloud.com", "live.com",
+    "mail.com", "ymail.com",
+}
+
+
+def is_foreign_email(text: str) -> bool:
+    """True если домен email входит в список запрещённых иностранных провайдеров."""
+    if "@" not in text:
+        return False
+    domain = text.strip().lower().rsplit("@", 1)[-1]
+    return domain in FOREIGN_EMAIL_DOMAINS
+
 DESIGNER_TELEGRAM_ID_2 = int(os.getenv("DESIGNER_TELEGRAM_ID_2", "0"))
 
 
@@ -85,7 +99,9 @@ PHONE_PROMPT = (
 )
 
 EMAIL_PROMPT = (
-    "📧 <b>Email</b>\n\nВведите email или нажмите «Пропустить»."
+    "📧 <b>Email</b>\n\nВведите email или нажмите «Пропустить».\n\n"
+    "<i>Принимаются только российские почтовые сервисы "
+    "(yandex.ru, mail.ru и др.).</i>"
 )
 
 
@@ -175,6 +191,14 @@ async def skip_contact_extra(callback: CallbackQuery, state: FSMContext):
 @router.message(OrderForm.contact_extra)
 async def contact_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
+    if is_foreign_email(email):
+        await message.answer(
+            "⚠️ Почта иностранных сервисов (Gmail, Yahoo, Outlook, iCloud и др.) "
+            "не принимается.\n\nВведите адрес на российском сервисе "
+            "(yandex.ru, mail.ru и др.) или нажмите «Пропустить».",
+            reply_markup=skip_inline_keyboard(),
+        )
+        return
     try: await message.delete()
     except Exception: pass
     await _finish_contact(message, state, email=email, user=message.from_user)
@@ -335,6 +359,14 @@ async def skip_brief_extra(callback: CallbackQuery, state: FSMContext):
 @router.message(OrderForm.brief_extra)
 async def brief_extra(message: Message, state: FSMContext):
     email = message.text or "не указан"
+    if is_foreign_email(email):
+        await message.answer(
+            "⚠️ Почта иностранных сервисов (Gmail, Yahoo, Outlook, iCloud и др.) "
+            "не принимается.\n\nВведите адрес на российском сервисе "
+            "(yandex.ru, mail.ru и др.) или нажмите «Пропустить».",
+            reply_markup=skip_inline_keyboard(),
+        )
+        return
     try: await message.delete()
     except Exception: pass
     await _finish_brief(message, state, email=email, user=message.from_user)
