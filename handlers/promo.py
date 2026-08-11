@@ -20,7 +20,8 @@ def _gen_code(length: int = 8) -> str:
 
 
 async def create_promo_table():
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS promo_codes (
             id           SERIAL PRIMARY KEY,
@@ -46,7 +47,8 @@ async def apply_promo(telegram_id: int, code: str) -> dict:
     {'ok': True, 'discount': 20} или {'ok': False, 'reason': '...'}
     """
     code = code.strip().upper()
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """SELECT id, discount_pct, uses_left, expires_at
                FROM promo_codes WHERE code=$1""", code
@@ -96,7 +98,8 @@ async def cmd_promo(message: Message):
             parse_mode="HTML",
         )
         # Сохраняем активный промокод в профиль пользователя
-        async with get_pool().acquire() as conn:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE users SET updated_at=NOW() WHERE telegram_id=$1",
                 message.from_user.id,
@@ -131,7 +134,8 @@ async def cmd_new_promo(message: Message):
         await message.answer("Неверный формат числа.")
         return
 
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         try:
             await conn.execute(
                 "INSERT INTO promo_codes (code, discount_pct, uses_left) VALUES ($1,$2,$3)",
@@ -155,7 +159,8 @@ async def cmd_list_promos(message: Message):
     """Список всех промокодов — только для дизайнера."""
     if message.from_user.id != DESIGNER_TELEGRAM_ID:
         return
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT code, discount_pct, uses_left FROM promo_codes ORDER BY created_at DESC LIMIT 10"
         )
