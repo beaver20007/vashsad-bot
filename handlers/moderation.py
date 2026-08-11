@@ -13,7 +13,8 @@ log = logging.getLogger(__name__)
 
 
 async def create_moderation_tables():
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute("""
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_whitelist BOOLEAN DEFAULT FALSE;
@@ -38,7 +39,8 @@ class BanCheckMiddleware(BaseMiddleware):
     ) -> Any:
         user = data.get("event_from_user")
         if user:
-            async with get_pool().acquire() as conn:
+            pool = await get_pool()
+            async with pool.acquire() as conn:
                 row = await conn.fetchrow(
                     "SELECT is_banned FROM users WHERE telegram_id=$1", user.id
                 )
@@ -62,7 +64,8 @@ async def cmd_ban(message: Message):
         return
     reason = parts[2] if len(parts) > 2 else "нет причины"
 
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET is_banned=TRUE WHERE telegram_id=$1", target_id
         )
@@ -87,7 +90,8 @@ async def cmd_unban(message: Message):
         await message.answer("USER_ID должен быть числом.")
         return
 
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET is_banned=FALSE WHERE telegram_id=$1", target_id
         )
@@ -112,7 +116,8 @@ async def cmd_whitelist(message: Message):
         await message.answer("USER_ID должен быть числом.")
         return
 
-    async with _pool.acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET is_whitelist=TRUE WHERE telegram_id=$1", target_id
         )
@@ -127,7 +132,8 @@ async def cmd_whitelist(message: Message):
 async def cmd_bans(message: Message):
     if message.from_user.id != DESIGNER_TELEGRAM_ID:
         return
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT u.telegram_id, u.first_name, u.username, u.is_banned, u.is_whitelist
                FROM users u WHERE u.is_banned=TRUE OR u.is_whitelist=TRUE
