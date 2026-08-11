@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_TELEGRAM_ID, DESIGNER_NAME
-from services.database import _pool
+from services.database import get_pool
 from services.calendar_service import generate_ics, build_google_calendar_url
 
 router = Router()
@@ -31,7 +31,7 @@ BOOKING_SERVICES = [
 
 async def _get_free_slots(days_ahead: int = 14) -> list[dict]:
     """Возвращает свободные слоты на ближайшие N дней."""
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT id, slot_dt, duration_min FROM booking_slots
                WHERE slot_dt > NOW() AND is_booked = FALSE
@@ -98,7 +98,7 @@ async def cb_book_slot(callback: CallbackQuery, state: FSMContext):
     slot_id = int(callback.data.split(":")[1])
     await state.update_data(slot_id=slot_id)
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         row = await conn.fetchrow("SELECT slot_dt FROM booking_slots WHERE id=$1", slot_id)
 
     dt: datetime = row["slot_dt"]
@@ -126,7 +126,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     svc_price = data["service_price"]
     svc_name  = next((l for l, k, _ in BOOKING_SERVICES if k == svc_key), svc_key)
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         await conn.execute(
             """INSERT INTO bookings (telegram_id, slot_id, service_key, service_name, service_price, phone)
                VALUES ($1,$2,$3,$4,$5,$6)""",
@@ -190,7 +190,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     try:
         from services.scheduler import schedule_booking_reminders
         # Получаем ID только что созданного booking
-        async with _pool.acquire() as conn:
+        async with get_pool().acquire() as conn:
             bid = await conn.fetchval(
                 "SELECT id FROM bookings WHERE telegram_id=$1 AND slot_id=$2 ORDER BY created_at DESC LIMIT 1",
                 message.from_user.id, slot_id,
@@ -241,7 +241,7 @@ async def cb_add_week_slots(callback: CallbackQuery):
     # Добавляем слоты Пн–Пт 10:00 и 14:00 на следующие 7 дней
     now = datetime.now()
     added = 0
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         for d in range(1, 8):
             dt = now + timedelta(days=d)
             if dt.weekday() >= 5:  # пропускаем выходные
@@ -264,7 +264,7 @@ async def cb_list_slots(callback: CallbackQuery):
     if callback.from_user.id != DESIGNER_TELEGRAM_ID:
         await callback.answer("Нет доступа", show_alert=True)
         return
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT slot_dt, is_booked FROM booking_slots
                WHERE slot_dt > NOW() ORDER BY slot_dt LIMIT 14"""
@@ -284,7 +284,7 @@ async def cb_list_slots(callback: CallbackQuery):
 
 
 async def create_booking_tables():
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS booking_slots (
             id           SERIAL PRIMARY KEY,

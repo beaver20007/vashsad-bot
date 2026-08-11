@@ -13,7 +13,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_TELEGRAM_ID
-from services.database import _pool
+from services.database import get_pool
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ async def cb_export(callback: CallbackQuery):
 
     since = datetime.now() - timedelta(days=days) if days < 9999 else datetime(2000, 1, 1)
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT o.id, o.service_name, o.status, o.created_at,
                       o.phone, o.email, o.wishes, o.service_price,
@@ -81,7 +81,7 @@ async def cmd_favorites_pdf(message: Message):
     telegram_id = message.from_user.id
     await message.answer("🌿 Генерирую PDF с вашими растениями…")
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT plant_name, latin_name, care_tips, added_at
                FROM user_plants
@@ -128,7 +128,7 @@ async def cb_csv(callback: CallbackQuery):
     period = callback.data.split(":")[1]
     await callback.answer("Генерирую CSV...")
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         if period == "all":
             rows = await conn.fetch(
                 "SELECT id, telegram_id, service_name AS service_type, status, created_at, phone AS contact_phone, service_price AS budget_range "
@@ -174,7 +174,7 @@ async def cmd_export_clients(message: Message):
 
     await message.answer("Генерирую список клиентов…")
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT DISTINCT ON (o.telegram_id)
                       o.name, o.phone, o.service_type, o.region, o.status, o.created_at

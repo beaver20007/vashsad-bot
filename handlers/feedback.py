@@ -6,7 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
 from config import DESIGNER_TELEGRAM_ID
-from services.database import _pool
+from services.database import get_pool
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ async def cb_nps(callback: CallbackQuery):
     score    = int(score)
 
     try:
-        async with _pool.acquire() as conn:
+        async with get_pool().acquire() as conn:
             await conn.execute(
                 """INSERT INTO nps_ratings (order_id, telegram_id, score)
                    VALUES ($1, $2, $3)
@@ -78,7 +78,7 @@ async def cb_nps(callback: CallbackQuery):
 
 async def create_nps_table():
     """Создаёт таблицу NPS если не существует. Вызывается из init_db."""
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS nps_ratings (
             order_id    INTEGER PRIMARY KEY,

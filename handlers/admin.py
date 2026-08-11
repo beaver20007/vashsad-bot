@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config import DESIGNER_TELEGRAM_ID
-from services.database import get_designer_stats, get_ab_stats, update_order_status, _pool
+from services.database import get_designer_stats, get_ab_stats, update_order_status, get_pool
 
 ORDER_STATUSES = {
     "new":        "🆕 Новая",
@@ -95,7 +95,7 @@ async def cb_recent_orders(callback: CallbackQuery):
 async def cmd_orders(message: Message):
     if not _only_designer(message):
         return
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         rows = await conn.fetch(
             """SELECT o.id, o.service_name, o.status, o.created_at,
                       u.first_name, u.telegram_id
@@ -131,7 +131,7 @@ async def cb_order_detail(callback: CallbackQuery):
         return
 
     order_id = int(callback.data.split(":")[-1])
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         row = await conn.fetchrow(
             """SELECT o.*, u.first_name, u.username, u.telegram_id as uid
                FROM orders o JOIN users u ON u.telegram_id = o.telegram_id
@@ -174,7 +174,7 @@ async def cb_set_status(callback: CallbackQuery, bot: Bot):
     order_id   = int(parts[2])
     new_status = parts[3]
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         row = await conn.fetchrow(
             "UPDATE orders SET status=$1 WHERE id=$2 RETURNING telegram_id, service_name",
             new_status, order_id,
@@ -282,7 +282,7 @@ async def cmd_broadcast(message: Message):
         await message.answer("Использование: /broadcast Текст сообщения")
         return
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE is_banned IS NOT TRUE")
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
@@ -314,7 +314,7 @@ async def cb_broadcast_confirm(callback: CallbackQuery):
     await callback.message.edit_text("📣 Рассылка запущена...")
     await callback.answer()
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         users = await conn.fetch("SELECT telegram_id FROM users WHERE is_banned IS NOT TRUE")
 
     sent = 0
@@ -431,7 +431,7 @@ async def receive_segment_text(message: Message):
     if not text:
         return
 
-    async with _pool.acquire() as conn:
+    async with get_pool().acquire() as conn:
         if segment == 'subscribed':
             users = await conn.fetch("SELECT telegram_id FROM users WHERE is_subscribed = TRUE AND (is_banned IS NOT TRUE)")
         elif segment == 'stars_subscribers':
