@@ -45,7 +45,8 @@ async def get_pool() -> asyncpg.Pool:
 
 async def _create_tables() -> None:
     async with _pool.acquire() as conn:
-        await conn.execute("""
+        try:
+            await conn.execute("""
         -- Пользователи
         CREATE TABLE IF NOT EXISTS users (
             telegram_id   BIGINT PRIMARY KEY,
@@ -187,6 +188,8 @@ async def _create_tables() -> None:
             UNIQUE(telegram_id)
         );
         """)
+        except (asyncpg.exceptions.DuplicateTableError, asyncpg.exceptions.DuplicateColumnError) as exc:
+            log.warning("_create_tables: базовые таблицы уже существуют, пропускаем: %s", exc)
 
     # Добавляем новые поля к users если их нет (ALTER TABLE IF NOT EXISTS колонка)
     async with _pool.acquire() as conn:
@@ -207,18 +210,28 @@ async def _create_tables() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_photo_url TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS season_plan TEXT",
         ]:
-            await conn.execute(col_sql)
-        # Переименовываем plot_size → garden_area если колонка ещё старая
-        await conn.execute("""
-            DO $$ BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='plot_size'
-                ) THEN
-                    ALTER TABLE users RENAME COLUMN plot_size TO garden_area;
-                END IF;
-            END $$;
-        """)
+            try:
+                await conn.execute(col_sql)
+            except asyncpg.exceptions.DuplicateColumnError as exc:
+                log.warning("_create_tables: колонка уже существует, пропускаем (%s): %s", col_sql, exc)
+        # Переименовываем plot_size → garden_area, только если garden_area ещё нет
+        # (иначе RENAME бьётся о существующую колонку — DuplicateColumnError)
+        try:
+            await conn.execute("""
+                DO $$ BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='plot_size'
+                    ) AND NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='users' AND column_name='garden_area'
+                    ) THEN
+                        ALTER TABLE users RENAME COLUMN plot_size TO garden_area;
+                    END IF;
+                END $$;
+            """)
+        except asyncpg.exceptions.DuplicateColumnError as exc:
+            log.warning("_create_tables: rename plot_size->garden_area пропущен, garden_area уже есть: %s", exc)
     log.info("✅ Таблицы созданы / проверены")
 
 
