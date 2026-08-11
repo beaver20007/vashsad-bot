@@ -39,7 +39,8 @@ async def cb_nps(callback: CallbackQuery):
     score    = int(score)
 
     try:
-        async with get_pool().acquire() as conn:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
             await conn.execute(
                 """INSERT INTO nps_ratings (order_id, telegram_id, score)
                    VALUES ($1, $2, $3)
@@ -78,7 +79,8 @@ async def cb_nps(callback: CallbackQuery):
 
 async def create_nps_table():
     """Создаёт таблицу NPS если не существует. Вызывается из init_db."""
-    async with get_pool().acquire() as conn:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS nps_ratings (
             order_id    INTEGER PRIMARY KEY,
