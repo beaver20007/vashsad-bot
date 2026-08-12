@@ -151,9 +151,8 @@ async def cmd_start(message: Message, state: FSMContext):
     # Screen deep links
     if args in SCREEN_LINKS:
         label, screen = SCREEN_LINKS[args]
-        miniapp_url = os.getenv('MINIAPP_URL', 'https://vashsad.vercel.app')
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text=f'Открыть {label}', web_app=WebAppInfo(url=f'{miniapp_url}?screen={screen}'))
+            InlineKeyboardButton(text=f'Открыть {label}', web_app=WebAppInfo(url=f'{MINI_APP_URL}?screen={screen}'))
         ]])
         await message.answer(
             f'🌿 Открываю <b>{label}</b> в приложении...',
@@ -173,9 +172,10 @@ async def cmd_start(message: Message, state: FSMContext):
                 parse_mode="HTML",
             )
 
-    # Onboarding-квиз для новых пользователей
-    from handlers.onboarding import maybe_start_onboarding
-    await maybe_start_onboarding(message, state, message.from_user.id)
+    # Onboarding-квиз отключён (F1.2): профиль (регион/площадь/стиль)
+    # заполняется через Mini App картинками, не текстовой FSM-анкетой в боте.
+    # from handlers.onboarding import maybe_start_onboarding
+    # await maybe_start_onboarding(message, state, message.from_user.id)
 
     # A/B тест приветствия
     variant, ab_text = _pick_ab_variant(message.from_user.id)

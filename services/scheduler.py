@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import DESIGNER_TELEGRAM_ID
+from config import DESIGNER_TELEGRAM_ID, MINI_APP_URL
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
 
@@ -365,7 +365,7 @@ async def self_ping_check(bot: Bot) -> None:
     try:
         async with aiohttp.ClientSession() as s:
             async with s.get(
-                'http://localhost:3000/api/health',
+                f'{MINI_APP_URL}/api/health',
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as r:
                 if r.status != 200:

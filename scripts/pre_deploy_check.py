@@ -24,7 +24,7 @@ OPTIONAL_ENV = [
     ("YOOKASSA_SECRET_KEY", "YooKassa secret key"),
     ("OPENWEATHER_API_KEY", "OpenWeatherMap API key"),
     ("ADMIN_TOKEN", "Admin token for API routes"),
-    ("MINIAPP_URL", "Miniapp URL for deep links"),
+    ("MINI_APP_URL", "Miniapp URL for deep links"),
     ("WELCOME_IMAGE_URL", "Welcome image URL"),
     ("DESIGNER_EMAIL", "Designer email for notifications"),
     ("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID public key for push notifications"),

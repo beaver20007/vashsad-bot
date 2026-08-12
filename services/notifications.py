@@ -15,7 +15,7 @@ from services.database import get_all_user_ids, log_notification
 
 log = logging.getLogger(__name__)
 
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad.vercel.app")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad-miniapp-pi.vercel.app")
 
 # Сезонные советы (ключи: vesna / leto / osen / zima)
 _SEASONAL_TIPS: dict[str, str] = {
