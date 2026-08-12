@@ -346,7 +346,7 @@ async def quick_diagnosis(message: Message):
 @router.message(F.text == "📋 Заказать услугу")
 async def quick_order(message: Message, state: FSMContext):
     from handlers.order import cmd_order
-    await cmd_order(message, state)
+    await cmd_order(message)
 
 
 @router.message(F.text == "💬 AI-чат")
