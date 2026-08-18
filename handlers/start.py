@@ -362,7 +362,6 @@ async def quick_book(message: Message, state: FSMContext):
 
 @router.message(F.text == "👤 Профиль")
 async def quick_profile(message: Message):
-    from handlers.price import cmd_profile
     await cmd_profile(message)
 
 
