@@ -48,10 +48,10 @@ async def broadcast_personalized_seasonal(bot: Bot, base_text: str) -> None:
         users = await conn.fetch(
             """SELECT u.telegram_id, u.first_name, u.region,
                       COALESCE(
-                        (SELECT string_agg(plant_name, ', ') FROM user_plants WHERE telegram_id = u.telegram_id LIMIT 5),
+                        (SELECT string_agg(name, ', ') FROM user_plants WHERE telegram_id = u.telegram_id LIMIT 5),
                         NULL
                       ) as plants
-               FROM users WHERE is_banned = FALSE OR is_banned IS NULL"""
+               FROM users u WHERE is_banned = FALSE OR is_banned IS NULL"""
         )
 
     sent, failed = 0, 0
