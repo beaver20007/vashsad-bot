@@ -6,4 +6,5 @@
 
 | Трек | Ветка | Worktree | Статус | Дата |
 |---|---|---|---|---|
-| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | `C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql` | PR открыт, ждёт мержа владельцем | 2026-08-18 |
+| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | `C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql` | Смёржен (PR #4, `c753f2c`) | 2026-08-18 |
+| redirect-order-to-miniapp | `fix/t-f32-order-redirect-miniapp` | `C:/Projects/_worktrees/vashsad-fix-order-redirect-miniapp` | PR открыт, ждёт мержа владельцем | 2026-08-18 |

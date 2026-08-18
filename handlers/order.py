@@ -11,9 +11,9 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, WebAppInfo
 
-from config import SERVICES, DESIGNER_TELEGRAM_ID, DESIGNER_NAME
+from config import SERVICES, DESIGNER_TELEGRAM_ID, DESIGNER_NAME, MINI_APP_URL
 from keyboards import (
     services_keyboard, order_confirm_keyboard,
     back_to_menu_keyboard, cancel_keyboard,
@@ -121,21 +121,43 @@ EMAIL_PROMPT = (
 )
 
 
-# ── Стартовые услуги ──
+# ── Заказ услуг — редирект в Mini App (F3.2, решение F1.2 от 05.08.2026) ──
+# Текстовая FSM-анкета ниже (services_keyboard, OrderForm и т.д.) больше не
+# запускается ни одной кнопкой/командой — код оставлен как есть (не удалён),
+# но недостижим. Единственный путь заказа — Mini App.
+
+ORDER_REDIRECT_TEXT = (
+    "📋 <b>Заказать услугу</b>\n\n"
+    "Оформление заявок — в приложении ВашСад: там же можно выбрать стиль "
+    "сада и услугу.\n\n"
+    "Нажмите кнопку ниже 👇"
+)
+
+
+def order_miniapp_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="🌿 Открыть ВашСад",
+            web_app=WebAppInfo(url=f"{MINI_APP_URL}?screen=order"),
+        )
+    )
+    return builder.as_markup()
+
 
 @router.message(Command("order"))
 async def cmd_order(message: Message):
     await message.answer(
-        "📋 <b>Заказать услугу</b>\n\nВыберите нужную услугу:",
-        parse_mode="HTML", reply_markup=services_keyboard(),
+        ORDER_REDIRECT_TEXT,
+        parse_mode="HTML", reply_markup=order_miniapp_keyboard(),
     )
 
 
 @router.callback_query(F.data == "menu:order")
 async def cb_order(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📋 <b>Заказать услугу</b>\n\nВыберите нужную услугу:",
-        parse_mode="HTML", reply_markup=services_keyboard(),
+        ORDER_REDIRECT_TEXT,
+        parse_mode="HTML", reply_markup=order_miniapp_keyboard(),
     )
     await callback.answer()
 
@@ -143,8 +165,8 @@ async def cb_order(callback: CallbackQuery):
 @router.callback_query(F.data == "order:start")
 async def cb_order_start(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📋 <b>Стартовые услуги</b>\n\nВыберите услугу:",
-        parse_mode="HTML", reply_markup=services_keyboard(),
+        ORDER_REDIRECT_TEXT,
+        parse_mode="HTML", reply_markup=order_miniapp_keyboard(),
     )
     await callback.answer()
 
@@ -323,14 +345,10 @@ async def _finish_contact(message, state, email, user, edit=False):
 # ── Бриф индивидуального проекта ──
 
 @router.callback_query(F.data == "order:project")
-async def cb_order_project(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(OrderForm.brief_area)
+async def cb_order_project(callback: CallbackQuery):
     await callback.message.edit_text(
-        "🏡 <b>Индивидуальный ландшафтный проект</b>\n\n"
-        "Заполним небольшой бриф — 4 вопроса + контакты.\n\n"
-        "📐 <b>Вопрос 1/4:</b> Какова площадь вашего участка?\n"
-        "<i>Например: 10 соток, 15 соток, 0.5 га</i>",
-        parse_mode="HTML", reply_markup=cancel_keyboard(),
+        ORDER_REDIRECT_TEXT,
+        parse_mode="HTML", reply_markup=order_miniapp_keyboard(),
     )
     await callback.answer()
 
