@@ -6,4 +6,5 @@
 
 | Трек | Ветка | Worktree | Статус | Дата |
 |---|---|---|---|---|
-| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | `C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql` | PR открыт, ждёт мержа владельцем | 2026-08-18 |
+| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | `C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql` | Смёржен (PR #4, `c753f2c`) | 2026-08-18 |
+| remove-bot-price-sources | `fix/t-f33-remove-bot-prices` | `C:/Projects/_worktrees/vashsad-fix-bot-prices` | PR открыт, ждёт мержа владельцем | 2026-08-18 |

@@ -46,7 +46,7 @@ async def cmd_book(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
     for label, key, price in BOOKING_SERVICES:
         builder.row(InlineKeyboardButton(
-            text=f"{label} — {price:,} ₽",
+            text=label,
             callback_data=f"book_svc:{key}:{price}",
         ))
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="menu:main"))
