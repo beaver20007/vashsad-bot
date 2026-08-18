@@ -4,14 +4,15 @@
 действия. Формат дат: YYYY-MM-DD.
 
 ## Текущее состояние main
-- main = `330a34b07f5997348dffe42b2734699df7b75a46` (F1.2-STOP: onboarding
-  отключён, self_ping и MINI_APP_URL дефолты исправлены), синхронизирован
-  с origin. Живая проверка владельцем подтвердила: `/start` без опроса,
-  self_ping-тревоги прекратились.
-- Обновлено: 2026-08-18, трек bot-live-recon + PR #4
-  (fix-quick-profile-and-broadcast).
-- ⚠️ PR #4 (`fix/t-quick-profile-broadcast-sql`) открыт, НЕ смёржен —
-  ждёт решения владельца (RED-класс, прод). См. «Ждёт человека».
+- main = `c753f2c212144ef64cbdd5bc5f47e54ef3a05fec` (merge PR #4:
+  quick_profile ImportError + broadcast_personalized_seasonal SQL),
+  синхронизирован с origin (`git rev-parse HEAD` == `git rev-parse
+  origin/main` после `git merge --ff-only origin/main`).
+- Обновлено: 2026-08-18, PR #4 смёржен по подтверждению владельца.
+- Ветка `fix/t-quick-profile-broadcast-sql` и её worktree
+  (`C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql`) НЕ
+  удалены (`gh pr merge --delete-branch=false`) — уборка отдельным
+  решением, как заведено для прочих веток в этом репо.
 - Railway CLI на этой машине настроен и подтверждён рабочим: `railway
   link -p vashsad` → сервис `vashsad-bot`, окружение `production`.
   `railway logs --since <N>h --lines <M>` и `railway run -- <cmd>`
@@ -139,9 +140,11 @@
    подтверждён рабочим на этой машине. Закрыто.
 3. **Блокер уведомлений miniapp** — статус не менялся с 2026-08-05,
    владелец ведёт эту часть самостоятельно вне координатора.
-4. **НОВОЕ — решение по PR #4**: `fix/t-quick-profile-broadcast-sql`
-   (github.com/beaver20007/vashsad-bot/pull/4) открыт, `MERGEABLE`, не
-   смёржен. Мерж и деплой — RED-класс, только по подтверждению владельца.
+4. ~~**Решение по PR #4**~~ — владелец подтвердил 2026-08-18, смёржено
+   (`gh pr merge 4 --merge`, merge commit `c753f2c`). Закрыто. Railway
+   должен подхватить автодеплоем — живая проверка `/profile` и
+   собственно `broadcast_personalized_seasonal` (следующий реальный
+   прогон — 1 октября) отдельно не выполнялась этой сессией.
 5. **НОВОЕ — вне рамок PR #4, отдельная находка**: `handlers/export.py:88`
    (`SELECT plant_name, latin_name, care_tips, added_at FROM user_plants`)
    — та же ошибка колонки, что была в `broadcast_personalized_seasonal`
@@ -501,3 +504,24 @@
   прошёл с первого раза. PR создан: `gh pr create` →
   github.com/beaver20007/vashsad-bot/pull/4, `mergeable: MERGEABLE`.
 - **НЕ смёржено** — RED-класс (прод), ждёт решения владельца.
+
+### 2026-08-18 — PR #4 смёржен
+- Владелец подтвердил мерж прямым текстом («мержи PR #4 в main»).
+- Проверка перед мержем: `gh pr view 4` — `mergeStateStatus: CLEAN`,
+  `mergeable: MERGEABLE`. `git merge-base origin/main
+  origin/fix/t-quick-profile-broadcast-sql` = `330a34b` (точка ветвления
+  ветки); `origin/main` с тех пор ушёл вперёd на docs-коммит `e668057`
+  (не пересекается по файлам). Трёхточечный `git diff --stat
+  origin/main...origin/fix/t-quick-profile-broadcast-sql` — те же 3
+  файла, что в PR, без неожиданных довесков.
+- Выполнено: `gh pr merge 4 --merge --delete-branch=false` → merge commit
+  `c753f2c212144ef64cbdd5bc5f47e54ef3a05fec`. Ветка НЕ удалена.
+- Приёмка фактом: `git fetch` → `git merge --ff-only origin/main` в
+  локальном `main` — fast-forward `e668057..c753f2c` без конфликтов;
+  `git rev-parse HEAD` == `git rev-parse origin/main` ==
+  `c753f2c...`; `git status --short` чист.
+- Открыто: живое подтверждение `/profile` без ошибки и фактического
+  прогона `broadcast_personalized_seasonal` на бою этой сессией не
+  делалось (broadcast реально сработает только 1 октября; `/profile`
+  можно проверить в реальном Telegram в любой момент — не выполнено,
+  т.к. владелец не просил).
