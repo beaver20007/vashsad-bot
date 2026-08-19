@@ -238,7 +238,7 @@ async def plan_generate(callback: CallbackQuery, state: FSMContext):
         await get_or_create_user(
             telegram_id=telegram_id,
             username=callback.from_user.username,
-            full_name=callback.from_user.full_name,
+            first_name=callback.from_user.first_name,
         )
         order_id = await save_order(
             telegram_id=telegram_id,
