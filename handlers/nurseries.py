@@ -132,7 +132,7 @@ async def cmd_nurseries(message: Message):
     user = await get_or_create_user(
         telegram_id=message.from_user.id,
         username=message.from_user.username,
-        full_name=message.from_user.full_name,
+        first_name=message.from_user.first_name,
     )
 
     region = _detect_region(getattr(user, "region", None) or (user.get("region") if isinstance(user, dict) else None))

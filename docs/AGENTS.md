@@ -11,4 +11,5 @@
 | remove-bot-price-sources | `fix/t-f33-remove-bot-prices` | `C:/Projects/_worktrees/vashsad-fix-bot-prices` | Смёржен (PR #6, `a7f0828`) | 2026-08-18 |
 | remove-chat-faq-prices | `fix/t-f34-remove-chat-faq-prices` | `C:/Projects/_worktrees/vashsad-fix-chat-faq-prices` | Смёржен (PR #7, `a0bba97`) | 2026-08-18 |
 | cleanup-dead-order-code | `fix/t-cleanup-dead-order-code` | `C:/Projects/_worktrees/vashsad-cleanup-dead-order-code` | Смёржен (PR #8, `b5bee8d`) | 2026-08-18 |
-| fix-plan-full-name-bug | `fix/t-plan-full-name` | `C:/Projects/_worktrees/vashsad-fix-plan-full-name` | PR открыт, ждёт мержа владельцем | 2026-08-19 |
+| fix-plan-full-name-bug | `fix/t-plan-full-name` | `C:/Projects/_worktrees/vashsad-fix-plan-full-name` | Смёржен (PR #9, `45c133e`) | 2026-08-19 |
+| fix-nurseries-full-name-bug | `fix/t-nurseries-full-name` | `C:/Projects/_worktrees/vashsad-fix-nurseries-full-name` | PR открыт, ждёт мержа владельцем | 2026-08-19 |
