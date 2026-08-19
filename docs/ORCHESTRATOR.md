@@ -4,12 +4,12 @@
 действия. Формат дат: YYYY-MM-DD.
 
 ## Текущее состояние main
-- main = `45c133eba100a458215bc312f13e777f9fa6a5f9` (merge PR #9: баг
-  full_name в plan.py), синхронизирован с origin.
-- Обновлено: 2026-08-19. PR #5-#9 смёржены и задеплоены — F1.2
-  архитектурно закрыта, мёртвый код order.py убран, баг full_name в
-  plan.py починен. PR #10 (тот же баг full_name в nurseries.py) открыт,
-  ждёт подтверждения владельца на мерж — RED-класс, прод.
+- main = `e61104fb8f69155f5e699a3a91759c2bbc18aa66` (merge PR #10: баг
+  full_name в nurseries.py), синхронизирован с origin.
+- Обновлено: 2026-08-19. PR #5-#10 смёржены и задеплоены — F1.2
+  архитектурно закрыта, мёртвый код order.py убран, баг full_name
+  починен и в plan.py, и в nurseries.py (последнее вхождение `full_name=`
+  в кодовой базе больше не встречается — подтверждено grep'ом в PR #10).
 - Ветка `fix/t-quick-profile-broadcast-sql` и её worktree
   (`C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql`) НЕ
   удалены (`gh pr merge --delete-branch=false`) — уборка отдельным
@@ -744,4 +744,18 @@
   'full_name'`; «после» — `get_or_create_user` проходит, возвращает
   реальную строку пользователя.
 - PR: github.com/beaver20007/vashsad-bot/pull/10, `CLEAN`/`MERGEABLE`.
-  Не смёржен — RED-класс, ждёт слова владельца.
+
+### 2026-08-19 — PR #10 мерж, уборка worktree
+- Владелец подтвердил мерж. `gh pr merge 10 --merge --delete-branch` →
+  merge commit `e61104f`, remote-ветка `fix/t-nurseries-full-name`
+  удалена автоматически. Локальный worktree
+  `C:/Projects/_worktrees/vashsad-fix-nurseries-full-name` мешал
+  автоудалению локальной ветки (`gh` предупредил, не блокер) — по
+  явному запросу владельца убран следом: `git worktree remove` +
+  `git branch -d` (PowerShell, Unix-подсистема git bash дала обычный
+  `errno 1`, см. машинные правила).
+- Локальный `main`: `git fetch` + `git merge --ff-only origin/main` —
+  чистый fast-forward `2a2f3e2..e61104f`, `git status --short` пуст.
+- Итог: баг `full_name=` (родовой для `plan.py`/`nurseries.py`, PR #9/#10)
+  закрыт полностью в обоих местах, где встречался. Открытых PR по этому
+  классу багов больше нет.
