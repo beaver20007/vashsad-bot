@@ -4,12 +4,12 @@
 действия. Формат дат: YYYY-MM-DD.
 
 ## Текущее состояние main
-- main = `40ccef1ab15b92b0ba8c659500e2d31ab9645be3` (docs: запись живой
-  проверки F1.2), синхронизирован с origin.
-- Обновлено: 2026-08-19. PR #5, #6, #7 смёржены и задеплоены (см. запись
-  2026-08-18 ниже) — F1.2 архитектурно закрыта. PR #8 (чистка мёртвого
-  кода order.py) и PR #9 (баг full_name в plan.py) открыты, ждут
-  подтверждения владельца на мерж — RED-класс, прод.
+- main = `45c133eba100a458215bc312f13e777f9fa6a5f9` (merge PR #9: баг
+  full_name в plan.py), синхронизирован с origin.
+- Обновлено: 2026-08-19. PR #5-#9 смёржены и задеплоены — F1.2
+  архитектурно закрыта, мёртвый код order.py убран, баг full_name в
+  plan.py починен. PR #10 (тот же баг full_name в nurseries.py) открыт,
+  ждёт подтверждения владельца на мерж — RED-класс, прод.
 - Ветка `fix/t-quick-profile-broadcast-sql` и её worktree
   (`C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql`) НЕ
   удалены (`gh pr merge --delete-branch=false`) — уборка отдельным
@@ -713,3 +713,35 @@
   триггерится только на push в `main`, не на PR) — `statusCheckRollup`
   пуст, это факт инфраструктуры, не упущение проверки. Не смёржен —
   RED-класс, ждёт слова владельца.
+
+### 2026-08-19 — PR #8/#9 мерж, PR #10 (тот же баг full_name в nurseries.py)
+- Владелец подтвердил мерж PR #8 и #9, дополнительно поставил короткий
+  трек: тот же баг `full_name=` в `handlers/nurseries.py:135`, тем же
+  способом, с такой же живой проверкой.
+- **PR #8**: проверка перед мержем — `mergeStateStatus: CLEAN`,
+  трёхточечный diff — `handlers/order.py` + `docs/AGENTS.md`, как
+  заявлено. `gh pr merge 8 --merge` → `b5bee8d`.
+- **PR #9**: после мержа PR #8 стал `CONFLICTING` (обе ветки правили
+  одну строку `docs/AGENTS.md`, тот же паттерн, что с PR #5/#6).
+  Резолвил в worktree: `git merge origin/main`, объединил обе строки
+  таблицы, закоммитил, запушил, `gh pr merge 9 --merge` → `45c133e`.
+  Диф после резолва — `docs/AGENTS.md` + `handlers/plan.py`, без
+  сюрпризов.
+- Локальный `main`: `git merge --ff-only origin/main` — fast-forward,
+  синхронизирован (`e668057`→...→`45c133e` по цепочке).
+- **PR #10** `fix-nurseries-full-name-bug`, ветка/worktree
+  `fix/t-nurseries-full-name`. `handlers/nurseries.py:135` — та же
+  ошибка (`full_name=` вместо `first_name=`), но **без** `try/except`
+  вокруг вызова и это первая строка `cmd_nurseries()` — значит
+  `/nurseries` сейчас падает необработанным исключением на КАЖДОМ
+  вызове, пользователь не получает вообще ничего (хуже, чем в
+  `plan.py`, где PDF хотя бы доходил до пользователя). Фикс — та же
+  замена на `first_name=message.from_user.first_name`. Grep после
+  фикса — `full_name=` в кодовой базе больше не встречается нигде.
+- Живая проверка (production DB через `railway run`, синтетический
+  `telegram_id`, удалён после теста): «до» — воспроизведён точный
+  `TypeError: get_or_create_user() got an unexpected keyword argument
+  'full_name'`; «после» — `get_or_create_user` проходит, возвращает
+  реальную строку пользователя.
+- PR: github.com/beaver20007/vashsad-bot/pull/10, `CLEAN`/`MERGEABLE`.
+  Не смёржен — RED-класс, ждёт слова владельца.
