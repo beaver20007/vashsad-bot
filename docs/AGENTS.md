@@ -13,4 +13,4 @@
 | cleanup-dead-order-code | `fix/t-cleanup-dead-order-code` | `C:/Projects/_worktrees/vashsad-cleanup-dead-order-code` | Смёржен (PR #8, `b5bee8d`) | 2026-08-18 |
 | fix-plan-full-name-bug | `fix/t-plan-full-name` | `C:/Projects/_worktrees/vashsad-fix-plan-full-name` | Смёржен (PR #9, `45c133e`) | 2026-08-19 |
 | fix-nurseries-full-name-bug | `fix/t-nurseries-full-name` | `C:/Projects/_worktrees/vashsad-fix-nurseries-full-name` (удалён после мержа) | Смёржен (PR #10, `e61104f`) | 2026-08-19 |
-| fix-export-plant-name-bug | `fix/t-export-plant-name` | `C:/Projects/_worktrees/vashsad-fix-export-plant-name` | PR открыт, ждёт мержа владельцем | 2026-08-20 |
+| fix-export-plant-name-bug | `fix/t-export-plant-name` | `C:/Projects/_worktrees/vashsad-fix-export-plant-name` (удалён после мержа) | Смёржен (PR #11, `857844a`) | 2026-08-20 |

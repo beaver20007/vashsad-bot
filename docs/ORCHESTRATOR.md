@@ -4,12 +4,13 @@
 действия. Формат дат: YYYY-MM-DD.
 
 ## Текущее состояние main
-- main = `e61104fb8f69155f5e699a3a91759c2bbc18aa66` (merge PR #10: баг
-  full_name в nurseries.py), синхронизирован с origin.
-- Обновлено: 2026-08-19. PR #5-#10 смёржены и задеплоены — F1.2
-  архитектурно закрыта, мёртвый код order.py убран, баг full_name
-  починен и в plan.py, и в nurseries.py (последнее вхождение `full_name=`
-  в кодовой базе больше не встречается — подтверждено grep'ом в PR #10).
+- main = `857844ac76e67130d7ff3cbb69a5a10f268cd96f` (merge PR #11:
+  favorites_pdf — несуществующие колонки в user_plants), синхронизирован
+  с origin.
+- Обновлено: 2026-08-20. PR #5-#11 смёржены и задеплоены — F1.2
+  архитектурно закрыта, мёртвый код order.py убран, баг `full_name=`
+  починен и в plan.py, и в nurseries.py (PR #9/#10), баг «неверное имя
+  колонки» в handlers/export.py (favorites_pdf, PR #11) тоже закрыт.
 - Ветка `fix/t-quick-profile-broadcast-sql` и её worktree
   (`C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql`) НЕ
   удалены (`gh pr merge --delete-branch=false`) — уборка отдельным
@@ -794,4 +795,22 @@
   Заголовок PR потребовал правки `gh pr edit` — первый `gh pr create` с
   кириллицей в `--title` (не в `--body-file`) ушёл транслитом через
   PowerShell inline-строку; тело с кириллицей через `--body-file` прошло
-  нормально. Не смёржен — RED-класс, ждёт слова владельца.
+  нормально.
+
+### 2026-08-20 — PR #11 мерж, уборка worktree
+- Владелец подтвердил мерж прямым текстом («мержи PR #11 в main»).
+- Проверка перед мержем: `gh pr view 11` — `mergeStateStatus: CLEAN`,
+  `mergeable: MERGEABLE`; `gh pr diff 11 --name-only` — ровно 2 файла
+  (`handlers/export.py`, `docs/AGENTS.md`), как заявлено в PR.
+- `gh pr merge 11 --merge --delete-branch` → merge commit `857844a`,
+  remote-ветка `fix/t-export-plant-name` удалена. Приёмка: `gh pr view 11`
+  → `state: MERGED`.
+- Локальный `main`: `git fetch` + `git merge --ff-only origin/main` —
+  чистый fast-forward `95f3864..857844a`. Worktree
+  `C:/Projects/_worktrees/vashsad-fix-export-plant-name` и локальная
+  ветка убраны тем же способом, что после PR #10 (`git worktree remove`
+  + `git branch -d`, PowerShell).
+- Итог: серия багов «неверное имя колонки» (родовая ошибка на трёх
+  независимых участках — `plan.py`/PR#9, `nurseries.py`/PR#10,
+  `export.py`/PR#11) закрыта полностью во всех трёх местах, где
+  обнаружена. Открытых PR по этой серии больше нет.
