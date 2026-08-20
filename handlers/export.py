@@ -85,7 +85,7 @@ async def cmd_favorites_pdf(message: Message):
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT plant_name, latin_name, care_tips, added_at
+            """SELECT name, location, notes, added_at
                FROM user_plants
                WHERE telegram_id = $1
                ORDER BY added_at DESC""",
@@ -239,16 +239,16 @@ def _build_favorites_pdf(rows) -> bytes:
     elems.append(HRFlowable(width="100%", thickness=1, color=SAGE, spaceAfter=12))
 
     for r in rows:
-        plant_name = r["plant_name"] or "Без названия"
-        latin_name = r["latin_name"] or ""
-        care_tips  = r["care_tips"] or ""
+        plant_name = r["name"] or "Без названия"
+        location   = r["location"] or ""
+        notes      = r["notes"] or ""
         added_at   = r["added_at"]
 
         elems.append(Paragraph(plant_name, plant_name_s))
-        if latin_name:
-            elems.append(Paragraph(latin_name, latin_style))
-        if care_tips:
-            elems.append(Paragraph(f"Уход: {care_tips}", care_style))
+        if location:
+            elems.append(Paragraph(location, latin_style))
+        if notes:
+            elems.append(Paragraph(f"Заметки: {notes}", care_style))
         if added_at:
             elems.append(Paragraph(
                 f"Добавлено: {added_at.strftime('%d.%m.%Y') if hasattr(added_at, 'strftime') else str(added_at)}",
