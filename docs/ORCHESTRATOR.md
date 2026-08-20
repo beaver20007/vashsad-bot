@@ -759,3 +759,39 @@
 - Итог: баг `full_name=` (родовой для `plan.py`/`nurseries.py`, PR #9/#10)
   закрыт полностью в обоих местах, где встречался. Открытых PR по этому
   классу багов больше нет.
+
+### 2026-08-20 — PR #11: favorites_pdf (handlers/export.py) — та же серия багов «неверное имя колонки»
+- Владелец поставил трек `fix-export-plant-name-bug` по находке из разведки
+  Ф34 (15.08, см. запись 2026-08-19): `handlers/export.py:88` селектил
+  `plant_name, latin_name, care_tips` из `user_plants` — задание описывало
+  это как тот же баг, что PR #9/#10 (одна неверная колонка).
+- **Факт оказался хуже задания**: в `user_plants` (`services/database.py:
+  107-117`) нет НИ ОДНОЙ из трёх колонок запроса — реальные колонки
+  `plant_slug, name, emoji, location, planted_at, notes, added_at`.
+  Уточнение по коду: сломанный запрос принадлежит команде
+  `/favorites_pdf`, не `/export` (в задании была указана `/export`) —
+  `/export` (`cmd_export`, строка 30) использует отдельный, рабочий запрос
+  к `orders`, этого бага не касается.
+- Рассмотрел и отклонил восстановление `latin_name`/`care_tips` через JOIN
+  с каталогом `plants` (там тоже другая схема — `name_latin`, нет
+  `care_tips` вовсе, есть `description`/`light`/`height_m`) — отдельное
+  архитектурное решение, вне рамок трека.
+- Фикс: `SELECT name, location, notes, added_at`; в `_build_favorites_pdf`
+  — `plant_name = r["name"]`, подзаголовок `location` вместо `latin_name`,
+  тело `notes` под заголовком «Заметки:» вместо «Уход:» (честнее — это
+  пользовательская заметка, не агрономический совет). Grep после фикса —
+  обращений к несуществующим колонкам в файле не осталось (только имя
+  ReportLab-стиля `plant_name_s`, не связано с БД).
+- Живая проверка (production DB через `railway run`, read-only):
+  «до» — воспроизведена точная `UndefinedColumnError: column "plant_name"
+  does not exist`; «после» — запрос вернул 2 реальные строки; дополнительно
+  вызван `_build_favorites_pdf()` с этими строками — валидный PDF (2023
+  байта, заголовок `%PDF-`). Данные в БД не менялись.
+- Трек: worktree `C:/Projects/_worktrees/vashsad-fix-export-plant-name`,
+  ветка `fix/t-export-plant-name`. `git show --stat` — 2 файла
+  (`handlers/export.py`, `docs/AGENTS.md`), без лишнего.
+- PR: github.com/beaver20007/vashsad-bot/pull/11, `CLEAN`/`MERGEABLE`.
+  Заголовок PR потребовал правки `gh pr edit` — первый `gh pr create` с
+  кириллицей в `--title` (не в `--body-file`) ушёл транслитом через
+  PowerShell inline-строку; тело с кириллицей через `--body-file` прошло
+  нормально. Не смёржен — RED-класс, ждёт слова владельца.
