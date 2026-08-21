@@ -26,6 +26,21 @@ ORDER_STATUSES = {
     "canceled":   "❌ Отменена",
 }
 
+# Фильтры /orders. "Отвечено" — не статус заявки (тот остаётся клиентским
+# жизненным циклом new/in_progress/review/done/canceled), а отдельный флаг
+# orders.replied ("хоть раз ответили клиенту"), исключая уже закрытые —
+# закрытая заявка с ответом показывается в "Закрыто", не дублируется.
+ORDER_FILTERS: dict[str, tuple[str, str | None]] = {
+    "all":         ("Все",        None),
+    "new":         ("🆕 Новые",    "o.status = 'new'"),
+    "in_progress": ("🔄 В работе", "o.status = 'in_progress'"),
+    "replied":     ("💬 Отвечено", "o.replied = TRUE AND o.status NOT IN ('done','canceled')"),
+    "closed":      ("✅ Закрыто",  "o.status IN ('done','canceled')"),
+}
+
+# Ожидание текста ответа клиенту: admin_id -> {order_id, client_id, order_label}
+_pending_replies: dict[int, dict] = {}
+
 
 # ---------------------------------------------------------------------------
 # /start — bootstrap: первый /start от пустой таблицы становится owner
@@ -170,50 +185,69 @@ async def cb_recent_orders(callback: CallbackQuery):
 
 
 # ---------------------------------------------------------------------------
-# /orders — перенесено из handlers/admin.py
+# /orders — список с фильтром по статусу, детали, смена статуса, «Ответить»
+# (перенесено из handlers/admin.py + трек admin-bot-layer-a-workflow)
 # ---------------------------------------------------------------------------
 
-@router.message(Command("orders"))
-async def cmd_orders(message: Message):
-    if not await is_admin(message.from_user.id):
-        return
+def _orders_filter_keyboard(active: str) -> list[list[InlineKeyboardButton]]:
+    row1, row2 = [], []
+    for i, (key, (label, _)) in enumerate(ORDER_FILTERS.items()):
+        text = f"• {label} •" if key == active else label
+        btn = InlineKeyboardButton(text=text, callback_data=f"admin:orders:{key}")
+        (row1 if i < 3 else row2).append(btn)
+    return [row1, row2]
+
+
+async def _render_orders_list(filter_key: str) -> tuple[str, InlineKeyboardMarkup]:
+    label, condition = ORDER_FILTERS.get(filter_key, ORDER_FILTERS["all"])
+    where = f"WHERE {condition}" if condition else ""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT o.id, o.service_name, o.status, o.created_at,
-                      u.first_name, u.telegram_id
-               FROM orders o
-               JOIN users u ON u.telegram_id = o.telegram_id
-               ORDER BY o.created_at DESC LIMIT 10"""
+            f"""SELECT o.id, o.service_name, o.status, o.created_at,
+                       u.first_name, u.telegram_id
+                FROM orders o
+                JOIN users u ON u.telegram_id = o.telegram_id
+                {where}
+                ORDER BY o.created_at DESC LIMIT 10"""
         )
-    if not rows:
-        await message.answer("Заявок пока нет.")
-        return
 
     builder = InlineKeyboardBuilder()
     for r in rows:
         status_icon = ORDER_STATUSES.get(r["status"], "❓")[:2]
         date = r["created_at"].strftime("%d.%m")
-        label = f"{status_icon} #{r['id']} {(r['service_name'] or '')[:18]} · {r['first_name'] or '?'} · {date}"
+        item_label = f"{status_icon} #{r['id']} {(r['service_name'] or '')[:18]} · {r['first_name'] or '?'} · {date}"
         builder.row(InlineKeyboardButton(
-            text=label,
-            callback_data=f"admin:order:{r['id']}",
+            text=item_label,
+            callback_data=f"admin:order:{r['id']}:{filter_key}",
         ))
+    for row in _orders_filter_keyboard(filter_key):
+        builder.row(*row)
 
-    await message.answer(
-        "📋 <b>Последние 10 заявок:</b>",
-        parse_mode="HTML",
-        reply_markup=builder.as_markup(),
-    )
+    text = f"📋 <b>Заявки — {label}</b>" if rows else f"📋 <b>Заявки — {label}</b>\n\nНичего не найдено."
+    return text, builder.as_markup()
 
 
-@router.callback_query(F.data.startswith("admin:order:"))
-async def cb_order_detail(callback: CallbackQuery):
+@router.message(Command("orders"))
+async def cmd_orders(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    text, markup = await _render_orders_list("all")
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+@router.callback_query(F.data.startswith("admin:orders:"))
+async def cb_orders_filter(callback: CallbackQuery):
     if not await is_admin(callback.from_user.id):
         await callback.answer("Нет доступа", show_alert=True)
         return
+    filter_key = callback.data.split(":")[2]
+    text, markup = await _render_orders_list(filter_key)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
 
-    order_id = int(callback.data.split(":")[-1])
+
+async def _render_order_detail(order_id: int, filter_key: str) -> tuple[str, InlineKeyboardMarkup] | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -223,33 +257,55 @@ async def cb_order_detail(callback: CallbackQuery):
             order_id,
         )
     if not row:
-        await callback.answer("Заявка не найдена", show_alert=True)
-        return
+        return None
 
     current = ORDER_STATUSES.get(row["status"], "❓")
+    replied_line = "\n💬 Клиенту уже отвечали" if row.get("replied") else ""
     text = (
         f"📋 <b>Заявка #{order_id}</b>\n\n"
         f"👤 {row['first_name'] or '—'} (@{row['username'] or '—'})\n"
         f"🛎 Услуга: {row['service_name'] or '—'}\n"
         f"📅 {row['created_at'].strftime('%d.%m.%Y %H:%M')}\n"
-        f"📊 Статус: {current}\n\n"
+        f"📊 Статус: {current}{replied_line}\n\n"
         f"📞 {row['phone'] or '—'} · 📧 {row['email'] or '—'}\n"
         f"💬 {row['wishes'] or '—'}"
     )
 
     builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="✉️ Ответить клиенту",
+        callback_data=f"admin:reply:{order_id}:{filter_key}",
+    ))
     for key, label in ORDER_STATUSES.items():
         if key != row["status"]:
-            builder.button(text=label, callback_data=f"admin:setstatus:{order_id}:{key}")
-    builder.adjust(2)
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="admin:recent_orders"))
+            builder.button(text=label, callback_data=f"admin:setstatus:{order_id}:{key}:{filter_key}")
+    builder.adjust(1, 2)
+    builder.row(InlineKeyboardButton(text="◀️ К списку", callback_data=f"admin:orders:{filter_key}"))
 
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    return text, builder.as_markup()
+
+
+@router.callback_query(F.data.startswith("admin:order:"))
+async def cb_order_detail(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    parts = callback.data.split(":")
+    order_id = int(parts[2])
+    filter_key = parts[3] if len(parts) > 3 else "all"
+
+    rendered = await _render_order_detail(order_id, filter_key)
+    if not rendered:
+        await callback.answer("Заявка не найдена", show_alert=True)
+        return
+    text, markup = rendered
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("admin:setstatus:"))
-async def cb_set_status(callback: CallbackQuery, bot: Bot):
+async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
     if not await is_admin(callback.from_user.id):
         await callback.answer("Нет доступа", show_alert=True)
         return
@@ -257,6 +313,7 @@ async def cb_set_status(callback: CallbackQuery, bot: Bot):
     parts = callback.data.split(":")
     order_id   = int(parts[2])
     new_status = parts[3]
+    filter_key = parts[4] if len(parts) > 4 else "all"
 
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -265,35 +322,128 @@ async def cb_set_status(callback: CallbackQuery, bot: Bot):
             new_status, order_id,
         )
 
-    if row:
-        label = ORDER_STATUSES.get(new_status, new_status)
-        status_texts = {
-            "in_progress": "🔄 Ваша заявка <b>принята в работу</b>! Дизайнер уже занимается вашим проектом.",
-            "review":      "👀 Ваша заявка <b>на согласовании</b>. Ожидайте обратной связи.",
-            "done":        "✅ Ваша заявка <b>выполнена</b>! Свяжитесь с дизайнером для получения результатов.",
-            "canceled":    "❌ Ваша заявка <b>отменена</b>. Если есть вопросы — напишите нам.",
-        }
-        msg_text = status_texts.get(new_status)
-        if msg_text:
-            try:
-                await bot.send_message(
-                    row["telegram_id"],
-                    f"📋 <b>Обновление по заявке #{order_id}</b>\n\n"
-                    f"Услуга: {row['service_name'] or '—'}\n\n"
-                    f"{msg_text}",
-                    parse_mode="HTML",
-                )
-            except Exception as e:
-                log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
-
-        await callback.answer(f"Статус → {label}", show_alert=False)
-        await cb_order_detail(callback)
-    else:
+    if not row:
         await callback.answer("Ошибка обновления", show_alert=True)
+        return
+
+    label = ORDER_STATUSES.get(new_status, new_status)
+    status_texts = {
+        "in_progress": "🔄 Ваша заявка <b>принята в работу</b>! Дизайнер уже занимается вашим проектом.",
+        "review":      "👀 Ваша заявка <b>на согласовании</b>. Ожидайте обратной связи.",
+        "done":        "✅ Ваша заявка <b>выполнена</b>! Свяжитесь с дизайнером для получения результатов.",
+        "canceled":    "❌ Ваша заявка <b>отменена</b>. Если есть вопросы — напишите нам.",
+    }
+    msg_text = status_texts.get(new_status)
+    if msg_text:
+        try:
+            # main_bot, не bot: клиент переписывается с основным ботом
+            # (TELEGRAM_BOT_TOKEN), не с этим админ-ботом — см. admin_bot.py.
+            await main_bot.send_message(
+                row["telegram_id"],
+                f"📋 <b>Обновление по заявке #{order_id}</b>\n\n"
+                f"Услуга: {row['service_name'] or '—'}\n\n"
+                f"{msg_text}",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
+
+    await callback.answer(f"Статус → {label}", show_alert=False)
+    rendered = await _render_order_detail(order_id, filter_key)
+    if rendered:
+        text, markup = rendered
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+
+
+# ---------------------------------------------------------------------------
+# «Ответить клиенту» — свободный текст уходит клиенту через main_bot
+# (трек admin-bot-layer-a-workflow)
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("admin:reply:"))
+async def cb_reply_start(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    parts = callback.data.split(":")
+    order_id = int(parts[2])
+    filter_key = parts[3] if len(parts) > 3 else "all"
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT o.telegram_id, o.service_name, u.first_name
+               FROM orders o JOIN users u ON u.telegram_id = o.telegram_id
+               WHERE o.id = $1""",
+            order_id,
+        )
+    if not row:
+        await callback.answer("Заявка не найдена", show_alert=True)
+        return
+
+    _pending_replies[callback.from_user.id] = {
+        "order_id": order_id,
+        "client_id": row["telegram_id"],
+        "filter_key": filter_key,
+    }
+    await callback.message.answer(
+        f"✉️ Ответ клиенту по заявке #{order_id} ({row['first_name'] or '—'}, "
+        f"{row['service_name'] or 'услуга'}).\n\n"
+        f"Следующим сообщением отправьте текст — он уйдёт клиенту от имени бота "
+        f"ВашСад. Отмена: /cancel_reply",
+    )
+    await callback.answer()
+
+
+@router.message(Command("cancel_reply"))
+async def cmd_cancel_reply(message: Message):
+    if _pending_replies.pop(message.from_user.id, None):
+        await message.answer("❌ Ответ отменён.")
+
+
+@router.message(lambda msg: msg.from_user.id in _pending_replies and not (msg.text or "").startswith("/"))
+async def receive_reply_text(message: Message, main_bot: Bot):
+    if not await is_admin(message.from_user.id):
+        return
+    pending = _pending_replies.get(message.from_user.id)
+    if not pending:
+        return
+    text = message.text or message.caption
+    if not text:
+        await message.answer("Поддерживается только текст. Отправьте текстовое сообщение или /cancel_reply.")
+        return
+
+    order_id = pending["order_id"]
+    client_id = pending["client_id"]
+    filter_key = pending["filter_key"]
+
+    try:
+        await main_bot.send_message(
+            client_id,
+            f"💬 <b>Сообщение от дизайнера ВашСад</b> (по заявке #{order_id}):\n\n{text}",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        log.warning("Не удалось отправить ответ клиенту %s: %s", client_id, e)
+        await message.answer(f"❌ Не доставлено клиенту: {e}")
+        return
+
+    del _pending_replies[message.from_user.id]
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE orders SET replied=TRUE WHERE id=$1", order_id)
+
+    await message.answer("✅ Отправлено клиенту.")
+    rendered = await _render_order_detail(order_id, filter_key)
+    if rendered:
+        detail_text, markup = rendered
+        await message.answer(detail_text, parse_mode="HTML", reply_markup=markup)
 
 
 @router.message(Command("update_order"))
-async def cmd_update_order(message: Message):
+async def cmd_update_order(message: Message, main_bot: Bot):
     if not await is_admin(message.from_user.id):
         return
     parts = message.text.split()
@@ -330,7 +480,8 @@ async def cmd_update_order(message: Message):
     notified = False
     if user_msg and row["telegram_id"]:
         try:
-            await message.bot.send_message(
+            # main_bot: клиент переписывается с основным ботом, не с этим.
+            await main_bot.send_message(
                 row["telegram_id"],
                 f"📋 <b>Обновление по заявке #{order_id}</b>\n"
                 f"Услуга: {service_label}\n\n"
@@ -382,7 +533,7 @@ async def cmd_broadcast(message: Message):
 
 
 @router.callback_query(F.data == "broadcast:confirm")
-async def cb_broadcast_confirm(callback: CallbackQuery):
+async def cb_broadcast_confirm(callback: CallbackQuery, main_bot: Bot):
     if not await is_admin(callback.from_user.id):
         await callback.answer()
         return
@@ -403,7 +554,8 @@ async def cb_broadcast_confirm(callback: CallbackQuery):
     failed = 0
     for row in users:
         try:
-            await callback.bot.send_message(row["telegram_id"], text, parse_mode="HTML")
+            # main_bot: рассылка клиентам, не с этим админ-ботом.
+            await main_bot.send_message(row["telegram_id"], text, parse_mode="HTML")
             sent += 1
         except Exception:
             failed += 1
@@ -506,7 +658,7 @@ async def cb_segment_chosen(callback: CallbackQuery):
 
 
 @router.message(lambda msg: msg.from_user.id in _pending_segments and _pending_segments.get(msg.from_user.id, {}).get('step') == 'await_text')
-async def receive_segment_text(message: Message):
+async def receive_segment_text(message: Message, main_bot: Bot):
     if not await is_admin(message.from_user.id):
         return
     data = _pending_segments.get(message.from_user.id, {})
@@ -561,7 +713,8 @@ async def receive_segment_text(message: Message):
     sent, failed = 0, 0
     for row in users:
         try:
-            await message.bot.send_message(row['telegram_id'], text, parse_mode="HTML")
+            # main_bot: рассылка клиентам, не с этим админ-ботом.
+            await main_bot.send_message(row['telegram_id'], text, parse_mode="HTML")
             sent += 1
         except Exception:
             failed += 1
