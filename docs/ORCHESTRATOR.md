@@ -1169,3 +1169,41 @@
   ранее весь день) — как только владелец в следующий раз откроет
   `/broadcast_segment` в `admin_bot`, все 7 региональных кнопок будут
   рабочими.
+
+### 2026-08-21 — PR #15: cleanup-admin-dupes
+- Владелец подтвердил, что `admin_bot` реально работает в проде с утра
+  (см. поправку факта выше) и поставил задачу убрать транзитное
+  дублирование, оставленное решением PR #12: `/stats /orders /broadcast
+  /broadcast_segment /ab_stats /ban /unban /whitelist /bans` из основного
+  бота — они теперь только в `admin_bot`.
+- Ветка/worktree `chore/t-cleanup-admin-dupes`,
+  `C:/Projects/_worktrees/vashsad-cleanup-admin-dupes`.
+- **`handlers/admin.py` удалён целиком** — в файле не было ничего, кроме
+  функций пяти убираемых команд (`/stats`, `/orders`+детали+статус,
+  `/broadcast`, `/ab_stats`, `/broadcast_segment`). Импорт и регистрация
+  `admin_router` убраны из `bot.py`.
+- **`handlers/moderation.py`**: убраны только 4 command-хендлера
+  (`/ban`/`/unban`/`/whitelist`/`/bans`). `BanCheckMiddleware` и
+  `create_moderation_tables()` НЕ тронуты — это инфраструктура основного
+  бота (реальное применение бана к пользователям), не дублирующая
+  admin-команда. Опустевший `router` модуля тоже убран, `bot.py`
+  поправлен соответственно (был импорт `router as moderation_router` +
+  регистрация в `include_routers`).
+- **Регресс для клиентов**: исключён по конструкции — все 9 команд были
+  под `DESIGNER_TELEGRAM_ID`, никогда не клиентские.
+- **Живая проверка**: реальный `polling` не запускал — Telegram не
+  позволяет двум процессам одновременно опрашивать один токен, а бот
+  прямо сейчас работает в проде (второй `getUpdates` конфликтовал бы с
+  живым). Вместо этого: (1) собрал тот же `Dispatcher` с тем же списком
+  роутеров и тем же `include_routers(...)`, что в `bot.py`, локально —
+  все импорты разрешились, регистрация 23 роутеров без исключений;
+  явно подтверждено `ModuleNotFoundError` для `handlers.admin` и
+  отсутствие `router`/`cmd_ban` в `handlers.moderation` при сохранении
+  `BanCheckMiddleware`/`create_moderation_tables`; (2) `pytest tests/` —
+  38 passed / 6 failed / 11 skipped, **сверил напрямую с
+  немодифицированным `main`** — идентичный набор из тех же 6
+  предсуществующих сбоев (`handlers.promo._pool`, FAQ-регионы), не
+  связанных с этой правкой. Ноль новых регрессий.
+- PR: github.com/beaver20007/vashsad-bot/pull/15, `CLEAN`/`MERGEABLE`.
+  Не RED (админ-команды, не клиентский код), но задел `bot.py` и живой
+  `handlers/moderation.py` — ждёт слова владельца.
