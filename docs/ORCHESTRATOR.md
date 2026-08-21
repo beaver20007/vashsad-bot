@@ -145,14 +145,17 @@
    должен подхватить автодеплоем — живая проверка `/profile` и
    собственно `broadcast_personalized_seasonal` (следующий реальный
    прогон — 1 октября) отдельно не выполнялась этой сессией.
-5. **НОВОЕ — вне рамок PR #4, отдельная находка**: `handlers/export.py:88`
-   (`SELECT plant_name, latin_name, care_tips, added_at FROM user_plants`)
-   — та же ошибка колонки, что была в `broadcast_personalized_seasonal`
-   (`user_plants` не имеет `plant_name`, только `name`). Обнаружено при
-   разведке 2026-08-18, НЕ входило в scope задачи (только quick_profile +
-   broadcast), не тронуто. Сработает при экспорте пользователем PDF со
-   своими растениями (`/export`) — нужен отдельный трек, когда владелец
-   решит взяться.
+5. ~~**`handlers/export.py:88` — баг колонки `plant_name`**~~ — закрыто
+   2026-08-20, PR #11 (`857844a`). Найдено 2026-08-18, было хуже
+   предполагаемого (3 несуществующие колонки, не 1) — см. журнал.
+6. **Деплой `admin_bot.py` (PR #12, `871f38e`, в main с 2026-08-21)** —
+   код в main, но не живёт в проде. Нужны ручные шаги владельца вне git:
+   создать бота в BotFather (имя «ВашСад Админ», username
+   `vashsad_admin_bot`), получить `ADMIN_BOT_TOKEN`, завести второй
+   Railway-сервис (`command: python admin_bot.py`, та же `DATABASE_URL`),
+   затем самому первым написать `/start` новому боту (bootstrap →
+   становится `owner`). После этого — живая проверка в реальном
+   Telegram, инструмента у сессии нет.
 
 ## Карантин / инциденты
 ### 2026-08-05 — INC-1: бот не отвечает на /start (Railway)
@@ -940,7 +943,40 @@
   делал, отдельный бриф в сессию miniapp после готовности этого трека.
 - PR: github.com/beaver20007/vashsad-bot/pull/12, `CLEAN`/`MERGEABLE`.
   Инструкция BotFather (имя «ВашСад Админ», username
-  `vashsad_admin_bot`, куда вписывать токен) — в теле PR. Не смёржен —
-  RED-класс (новый прод-компонент с доступом к пользовательским данным),
-  ждёт слова владельца. Деплой в любом случае требует ручного участия
-  владельца (создание Railway-сервиса, токен из BotFather) сверх мержа.
+  `vashsad_admin_bot`, куда вписывать токен) — в теле PR. RED-класс (новый
+  прод-компонент с доступом к пользовательским данным) — мержа ждал
+  отдельного подтверждения владельца.
+
+### 2026-08-21 — PR #12 мерж, уборка worktree
+- Владелец подтвердил мерж прямым текстом («мержи PR #12 в main»).
+- Проверка перед мержем: `gh pr view 12` → сначала `mergeStateStatus:
+  UNKNOWN` (GitHub ещё не пересчитал), повторный запрос → `DIRTY`/
+  `CONFLICTING` — main ушёл вперёд докс-коммитом `03ee029` (recon-
+  python-lint-ci + этот же PR #12), задевшим ту же строку
+  `docs/AGENTS.md`, что и ветка PR. Тот же паттерн, что с PR #5/#6 и
+  #8/#9 ранее сегодня.
+- Резолв в worktree: `git merge origin/main`, конфликт — обе стороны
+  правили одну строку таблицы активных треков (разница только в наличии
+  номера PR), взял более полную версию (с «PR #12»), закоммитил
+  (`959bdae`), запушил. `gh pr diff 12 --name-only` после резолва — ровно
+  6 файлов PR (`docs/AGENTS.md` совпал с main и выпал из диффа —
+  ожидаемо), без сюрпризов. `gh pr view 12` → `CLEAN`/`MERGEABLE`.
+- `gh pr merge 12 --merge --delete-branch` → merge commit `871f38e`,
+  remote-ветка `feat/t-scaffold-admin-bot` удалена. Приёмка: `gh pr view
+  12` → `state: MERGED`.
+- Локальный `main`: `git fetch` + `git merge --ff-only origin/main` —
+  чистый fast-forward `03ee029..871f38e`, 6 файлов (`admin_bot.py`,
+  `services/admin_auth.py`, `handlers/admin_bot_handlers.py`,
+  `docker-compose.yml`, `.env.example`, `CLAUDE.md`). Worktree
+  `C:/Projects/_worktrees/vashsad-scaffold-admin-bot` и локальная ветка
+  убраны тем же способом, что после предыдущих PR (`git worktree remove`
+  + `git branch -d`).
+- **Итог**: `admin_bot.py` в main, но НЕ живёт в проде — это ровно код,
+  деплой требует отдельных ручных шагов владельца вне git (создать бота
+  в BotFather, получить `ADMIN_BOT_TOKEN`, завести второй Railway-сервис
+  с `command: python admin_bot.py`, вписать токен и `DATABASE_URL`).
+  Открытый пункт «Ждёт человека»: живая проверка `/start` → bootstrap
+  owner в реальном Telegram, после того как владелец пройдёт эти шаги.
+  Оригинальные команды в `handlers/admin.py`/`moderation.py` основного
+  бота сознательно НЕ убраны (см. решение выше) — уборка дублей отдельным
+  треком после подтверждения, что `admin_bot` реально работает в проде.

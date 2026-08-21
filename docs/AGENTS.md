@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | Статус | Дата |
-|---|---|---|---|---|
-| scaffold-admin-bot | `feat/t-scaffold-admin-bot` | `C:/Projects/_worktrees/vashsad-scaffold-admin-bot` | PR #12 открыт, ждёт мержа владельцем | 2026-08-20 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| scaffold-admin-bot | `feat/t-scaffold-admin-bot` | #12, `871f38e` | 2026-08-21 |
 | fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | #4, `c753f2c` | 2026-08-18 |
 | redirect-order-to-miniapp | `fix/t-f32-order-redirect-miniapp` | #5, `5492d59` | 2026-08-18 |
 | remove-bot-price-sources | `fix/t-f33-remove-bot-prices` | #6, `a7f0828` | 2026-08-18 |
