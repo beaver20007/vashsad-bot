@@ -11,10 +11,8 @@
   архитектурно закрыта, мёртвый код order.py убран, баг `full_name=`
   починен и в plan.py, и в nurseries.py (PR #9/#10), баг «неверное имя
   колонки» в handlers/export.py (favorites_pdf, PR #11) тоже закрыт.
-- Ветка `fix/t-quick-profile-broadcast-sql` и её worktree
-  (`C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql`) НЕ
-  удалены (`gh pr merge --delete-branch=false`) — уборка отдельным
-  решением, как заведено для прочих веток в этом репо.
+- Все смёрженные ветки/worktree треков (PR #1-#11) убраны чисткой
+  `cleanup-merged-branches` 2026-08-20 — см. запись в журнале ниже.
 - Railway CLI на этой машине настроен и подтверждён рабочим: `railway
   link -p vashsad` → сервис `vashsad-bot`, окружение `production`.
   `railway logs --since <N>h --lines <M>` и `railway run -- <cmd>`
@@ -814,3 +812,54 @@
   независимых участках — `plan.py`/PR#9, `nurseries.py`/PR#10,
   `export.py`/PR#11) закрыта полностью во всех трёх местах, где
   обнаружена. Открытых PR по этой серии больше нет.
+
+### 2026-08-20 — cleanup-merged-branches: чистка смёрженных веток (аналог Ф11 в miniapp)
+- Задача владельца: почистить смёрженные ветки в репозитории бота — за
+  два дня прошло 11 PR (#1-#11), ветки после мержа не всегда удалялись
+  сразу. Прямое администрирование, без RED-паузы (владелец: удаление уже
+  смёрженного обратимо, история в main).
+- **Список ДО** (`git branch -a` после `git fetch --prune`): 6 локальных
+  веток-треков с активными worktree (PR #4-#9: `fix/t-quick-profile-
+  broadcast-sql`, `fix/t-f32-order-redirect-miniapp`, `fix/t-f33-remove-
+  bot-prices`, `fix/t-f34-remove-chat-faq-prices`, `fix/t-cleanup-dead-
+  order-code`, `fix/t-plan-full-name`) + remote-ветка `fix/t-nurseries-
+  full-name` (PR #10, worktree уже убран раньше, но remote-ветка
+  осталась — `gh pr merge --delete-branch` тогда не смог удалить и
+  локальную, и remote, споткнувшись о worktree) + remote-ветки `fix/
+  await-get-pool`, `fix/idempotent-create-tables`, `fix/pool-import-
+  pattern` (PR #1-#3, никогда не имели worktree в этом дереве). Итого 10
+  смёрженных веток-кандидатов на удаление.
+- **Двойная проверка** (как в miniapp Ф11): для каждой из 10 —
+  `git log <branch> --not main --oneline` дал пустой вывод (0 уникальных
+  коммитов) до какого-либо удаления. Ни одна ветка не потребовала
+  эскалации по этому критерию.
+- Выполнено по каждой: `git worktree remove` (только для 6 веток PR
+  #4-#9, где worktree ещё существовал) → `git branch -d` (локально, для
+  тех же 6 + не потребовалось для remote-only) → `git push origin
+  --delete` (для всех 10, включая 3 без локальной копии). Все прошли без
+  ошибок (`git branch -d` — safe-delete, ни разу не потребовал `-D`).
+- **Не тронуто, отдельно** (как просил бриф — не удалять при неполном
+  соответствии критерию, доложить):
+  - `feat/max-integration` (локальная + remote) — не смёржена в main
+    (`git branch --no-merged main`), на СТОПе по решению владельца.
+  - `origin/rescue/pre-orchestrator-20260725` — не смёржена в main.
+  - `origin/backup/home-copy-20260731` — технически прошла бы проверку
+    (0 уникальных коммитов, была источником fast-forward мержа 04.08),
+    но `docs/ORCHESTRATOR.md` с самого мержа (запись t-vrc-merge)
+    отдельно фиксировал «НЕ удалять — уборка веток отдельным решением».
+    Не стал переопределять это явным старым решением без нового
+    подтверждения владельца именно по этой ветке — оставлена, доложена
+    отдельно здесь.
+- **Список ПОСЛЕ** (`git branch -a` после `git fetch --prune`): `main`,
+  `feat/max-integration` (локально и remote), `remotes/origin/HEAD ->
+  origin/main`, `remotes/origin/backup/home-copy-20260731`,
+  `remotes/origin/main`, `remotes/origin/rescue/pre-orchestrator-
+  20260725`. Ровно `main` + 3 сознательно нетронутые ветки, как в цели
+  задачи.
+- `docs/AGENTS.md` переписан: таблица активных треков теперь пустая
+  (комментарий «все смёржены»), добавлена секция «Архив» (10 закрытых
+  треков/веток с PR и датой мержа, включая допроектные PR #1-#3) и
+  секция «Не тронуто чисткой» с обоснованием по каждой из 3 веток.
+  `docs/ORCHESTRATOR.md` (этот файл) — устаревшая запись про
+  недоудалённую ветку PR #4 (строка в разделе «Текущее состояние main»)
+  заменена на ссылку на эту запись.

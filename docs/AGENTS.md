@@ -4,13 +4,33 @@
 этой таблице. Мержит и деплоит только Оркестратор, после подтверждения
 владельца (RED-класс для прода).
 
-| Трек | Ветка | Worktree | Статус | Дата |
-|---|---|---|---|---|
-| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | `C:/Projects/_worktrees/vashsad-fix-quick-profile-broadcast-sql` | Смёржен (PR #4, `c753f2c`) | 2026-08-18 |
-| redirect-order-to-miniapp | `fix/t-f32-order-redirect-miniapp` | `C:/Projects/_worktrees/vashsad-fix-order-redirect-miniapp` | Смёржен (PR #5, `5492d59`) | 2026-08-18 |
-| remove-bot-price-sources | `fix/t-f33-remove-bot-prices` | `C:/Projects/_worktrees/vashsad-fix-bot-prices` | Смёржен (PR #6, `a7f0828`) | 2026-08-18 |
-| remove-chat-faq-prices | `fix/t-f34-remove-chat-faq-prices` | `C:/Projects/_worktrees/vashsad-fix-chat-faq-prices` | Смёржен (PR #7, `a0bba97`) | 2026-08-18 |
-| cleanup-dead-order-code | `fix/t-cleanup-dead-order-code` | `C:/Projects/_worktrees/vashsad-cleanup-dead-order-code` | Смёржен (PR #8, `b5bee8d`) | 2026-08-18 |
-| fix-plan-full-name-bug | `fix/t-plan-full-name` | `C:/Projects/_worktrees/vashsad-fix-plan-full-name` | Смёржен (PR #9, `45c133e`) | 2026-08-19 |
-| fix-nurseries-full-name-bug | `fix/t-nurseries-full-name` | `C:/Projects/_worktrees/vashsad-fix-nurseries-full-name` (удалён после мержа) | Смёржен (PR #10, `e61104f`) | 2026-08-19 |
-| fix-export-plant-name-bug | `fix/t-export-plant-name` | `C:/Projects/_worktrees/vashsad-fix-export-plant-name` (удалён после мержа) | Смёржен (PR #11, `857844a`) | 2026-08-20 |
+## Активные треки
+
+Пусто — все треки ниже смёржены, ветки и worktree убраны чисткой
+2026-08-20 (`cleanup-merged-branches`).
+
+## Архив (смёржено, ветка/worktree удалены)
+
+| Трек | Ветка (была) | PR | Дата мержа |
+|---|---|---|---|
+| fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | #4, `c753f2c` | 2026-08-18 |
+| redirect-order-to-miniapp | `fix/t-f32-order-redirect-miniapp` | #5, `5492d59` | 2026-08-18 |
+| remove-bot-price-sources | `fix/t-f33-remove-bot-prices` | #6, `a7f0828` | 2026-08-18 |
+| remove-chat-faq-prices | `fix/t-f34-remove-chat-faq-prices` | #7, `a0bba97` | 2026-08-18 |
+| cleanup-dead-order-code | `fix/t-cleanup-dead-order-code` | #8, `b5bee8d` | 2026-08-18 |
+| fix-plan-full-name-bug | `fix/t-plan-full-name` | #9, `45c133e` | 2026-08-19 |
+| fix-nurseries-full-name-bug | `fix/t-nurseries-full-name` | #10, `e61104f` | 2026-08-19 |
+| fix-export-plant-name-bug | `fix/t-export-plant-name` | #11, `857844a` | 2026-08-20 |
+| (допроектные, до конвенции треков) | `fix/idempotent-create-tables` | #1 | 2026-08-11 |
+| (допроектные, до конвенции треков) | `fix/pool-import-pattern` | #2 | 2026-08-11 |
+| (допроектные, до конвенции треков) | `fix/await-get-pool` | #3 | 2026-08-11 |
+
+## Не тронуто чисткой (не смёржено или отдельное решение)
+
+- `feat/max-integration` — на СТОПе по решению владельца, не смёржена в main
+  (`git branch --no-merged main`). Не удалять, не мержить.
+- `origin/rescue/pre-orchestrator-20260725` — не смёржена в main. Не трогать.
+- `origin/backup/home-copy-20260731` — технически 0 уникальных коммитов
+  относительно main (была источником fast-forward мержа 04.08), но её
+  уборка отмечена в docs/ORCHESTRATOR.md как «отдельное решение» —
+  сознательно не удалена в этом проходе, см. ORCHESTRATOR.md.
