@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | Статус | Дата |
-|---|---|---|---|---|
-| cleanup-admin-dupes | `chore/t-cleanup-admin-dupes` | `C:/Projects/_worktrees/vashsad-cleanup-admin-dupes` | PR #15 открыт, ждёт мержа владельцем | 2026-08-21 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| cleanup-admin-dupes | `chore/t-cleanup-admin-dupes` | #15, `3468f80` | 2026-08-21 |
 | fix-broadcast-region-segments | `fix/t-broadcast-region-segments` | #14, `2c02c18` | 2026-08-21 |
 | admin-bot-layer-a-workflow | `feat/t-adminbot-layer-a` | #13, `cb74a3a` | 2026-08-21 |
 | scaffold-admin-bot | `feat/t-scaffold-admin-bot` | #12, `871f38e` | 2026-08-21 |
