@@ -8,7 +8,7 @@
 
 | Трек | Ветка | Worktree | Статус | Дата |
 |---|---|---|---|---|
-| admin-bot-layer-a-workflow | `feat/t-adminbot-layer-a` | `C:/Projects/_worktrees/vashsad-adminbot-layer-a` | PR открыт, ждёт мержа владельцем | 2026-08-21 |
+| admin-bot-layer-a-workflow | `feat/t-adminbot-layer-a` | `C:/Projects/_worktrees/vashsad-adminbot-layer-a` | PR #13 открыт, ждёт мержа владельцем | 2026-08-21 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
