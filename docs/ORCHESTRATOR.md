@@ -1044,4 +1044,28 @@
   ни одного telegram_id Beaver/Ани в системе не зафиксировано, тестового
   получателя нет.
 - PR: github.com/beaver20007/vashsad-bot/pull/13, `CLEAN`/`MERGEABLE`.
-  RED-класс (реальная переписка с клиентами) — ждёт слова владельца.
+
+### 2026-08-21 — PR #13 мерж, уборка worktree
+- Владелец подтвердил мерж прямым текстом («мержи PR #13 в main»).
+- Проверка перед мержем: `gh pr view 13` → `UNKNOWN` → повтор →
+  `DIRTY`/`CONFLICTING` — main ушёл вперёд докс-коммитом `9909d0d`, тот же
+  паттерн, что с PR #5/#6, #8/#9, #11/#12 сегодня (обе ветки правят одну
+  строку таблицы активных треков в `docs/AGENTS.md`).
+- Резолв в worktree: `git merge origin/main`, конфликт — та же строка
+  (различие только в номере PR), взял более полную версию, закоммитил
+  (`f2a5756`), запушил. `gh pr diff 13 --name-only` после резолва — ровно
+  3 файла PR (`admin_bot.py`, `handlers/admin_bot_handlers.py`,
+  `services/admin_auth.py`; `docs/AGENTS.md` совпал с main и выпал из
+  диффа — ожидаемо). `gh pr view 13` → `CLEAN`/`MERGEABLE`.
+- `gh pr merge 13 --merge --delete-branch` → merge commit `cb74a3a`,
+  remote-ветка `feat/t-adminbot-layer-a` удалена. Приёмка: `gh pr view 13`
+  → `state: MERGED`.
+- Локальный `main`: `git fetch` + `git merge --ff-only origin/main` —
+  чистый fast-forward `9909d0d..cb74a3a`. Worktree
+  `C:/Projects/_worktrees/vashsad-adminbot-layer-a` и локальная ветка
+  убраны тем же способом, что после предыдущих PR.
+- **Итог**: слой A (`/orders` с фильтром по статусу, «Ответить клиенту»,
+  фикс кросс-бот отправки на `main_bot`) в main. Не живёт в проде, пока
+  владелец не завершит ручную настройку `admin_bot` как Railway-сервиса
+  (см. пункт 6 «Ждёт человека» — тот же незакрытый пункт с PR #12, ничего
+  нового не добавилось).

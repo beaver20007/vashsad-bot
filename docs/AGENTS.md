@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | Статус | Дата |
-|---|---|---|---|---|
-| admin-bot-layer-a-workflow | `feat/t-adminbot-layer-a` | `C:/Projects/_worktrees/vashsad-adminbot-layer-a` | PR #13 открыт, ждёт мержа владельцем | 2026-08-21 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| admin-bot-layer-a-workflow | `feat/t-adminbot-layer-a` | #13, `cb74a3a` | 2026-08-21 |
 | scaffold-admin-bot | `feat/t-scaffold-admin-bot` | #12, `871f38e` | 2026-08-21 |
 | fix-quick-profile-and-broadcast | `fix/t-quick-profile-broadcast-sql` | #4, `c753f2c` | 2026-08-18 |
 | redirect-order-to-miniapp | `fix/t-f32-order-redirect-miniapp` | #5, `5492d59` | 2026-08-18 |
