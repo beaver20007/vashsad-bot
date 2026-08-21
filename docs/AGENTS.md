@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | Статус | Дата |
+|---|---|---|---|---|
+| cleanup-admin-dupes | `chore/t-cleanup-admin-dupes` | `C:/Projects/_worktrees/vashsad-cleanup-admin-dupes` | PR открыт, ждёт мержа владельцем | 2026-08-21 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
