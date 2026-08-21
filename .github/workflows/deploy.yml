@@ -33,7 +33,7 @@ jobs:
         # `|| echo "No tests found"` это скрывал — тест ни разу реально
         # не выполнился на push в main. Теперь реально выполняется, просто
         # non-blocking.
-        run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — не блокирует деплой, известные преюдиционные сбои см. PR #15/#16"
+        run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — не блокирует деплой, известные преюдиционные сбои см. PR 15 и 16"
 
   deploy:
     needs: test

@@ -27,4 +27,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
-      - run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — известные преюдиционные сбои, см. PR #15/#16"
+      - run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — известные преюдиционные сбои, см. PR 15 и 16"
