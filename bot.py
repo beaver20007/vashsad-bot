@@ -22,14 +22,13 @@ from handlers.photo import router as photo_router
 from handlers.price import router as price_router
 from handlers.guide import router as guide_router
 from handlers.referral import router as referral_router
-from handlers.admin import router as admin_router
 from handlers.payment import router as payment_router
 from handlers.onboarding import router as onboarding_router
 from handlers.feedback import router as feedback_router
 from handlers.booking import router as booking_router
 from handlers.promo import router as promo_router
 from handlers.inline_mode import router as inline_router
-from handlers.moderation import router as moderation_router, BanCheckMiddleware
+from handlers.moderation import BanCheckMiddleware
 from handlers.rate_limit import RateLimitMiddleware
 from handlers.export import router as export_router
 from handlers.payment_stars import router as payment_stars_router
@@ -99,13 +98,11 @@ async def main():
         price_router,
         guide_router,
         referral_router,
-        admin_router,
         payment_router,
         feedback_router,
         booking_router,
         promo_router,
         inline_router,
-        moderation_router,
         export_router,
         payment_stars_router,
         poll_router,
