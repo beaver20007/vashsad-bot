@@ -12,6 +12,8 @@
 ```
 vashsad-full/
 ├── bot.py                        # Точка входа, регистрация роутеров
+├── admin_bot.py                  # Второй бот (свой токен) — /stats /orders /broadcast /ban и т.д.
+│                                    доступ по таблице admin_users (owner/team), не по DESIGNER_TELEGRAM_ID
 ├── config.py                     # Настройки (.env)
 ├── keyboards.py                  # Все InlineKeyboard
 ├── setup_bot.py                  # Настройка команд BotFather
@@ -63,6 +65,7 @@ vashsad-full/
 ## Key Variables (.env)
 ```
 TELEGRAM_BOT_TOKEN=         # @BotFather
+ADMIN_BOT_TOKEN=            # @BotFather, отдельный бот для admin_bot.py
 ANTHROPIC_API_KEY=          # console.anthropic.com
 DESIGNER_TELEGRAM_ID=       # Telegram ID дизайнера для уведомлений
 DESIGNER_NAME=              # Имя дизайнера
