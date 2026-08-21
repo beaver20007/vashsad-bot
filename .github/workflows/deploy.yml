@@ -22,10 +22,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest tests/ --tb=short -q || echo "No tests found"
+        # Не блокирует deploy (см. deploy job ниже, needs: test всё равно
+        # проходит) — 6 тестов падают преюдиционно (не связано с main на
+        # момент push), см. recon-python-lint-ci / PR #15/#16. Раньше эта
+        # команда молча ничего не запускала: requirements.txt не содержал
+        # pytest, "python -m pytest" падал с "No module named pytest",
+        # `|| echo "No tests found"` это скрывал — тест ни разу реально
+        # не выполнился на push в main. Теперь реально выполняется, просто
+        # non-blocking.
+        run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — не блокирует деплой, известные преюдиционные сбои см. PR 15 и 16"
 
   deploy:
     needs: test
