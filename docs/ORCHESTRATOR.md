@@ -863,3 +863,84 @@
   `docs/ORCHESTRATOR.md` (этот файл) — устаревшая запись про
   недоудалённую ветку PR #4 (строка в разделе «Текущее состояние main»)
   заменена на ссылку на эту запись.
+
+### 2026-08-20 — recon-python-lint-ci (read-only): линтера и CI на PR нет вообще
+- Задача владельца: понять, есть ли Python-линтер и CI на pull_request
+  (аналог Ф10/ESLint в miniapp). Read-only, без правок.
+- Факт: `.github/workflows/` содержит только `deploy.yml`, триггер
+  `push: branches: [main]` — ни один workflow не срабатывает на
+  `pull_request`. Job `test` (pytest) внутри `deploy.yml` тоже выполняется
+  только при push в main — то есть все 11 сегодняшних PR смёржены без
+  единой автоматической проверки, включая уже существующие тесты.
+- Линтера нет: `requirements.txt` без `flake8`/`black`/`ruff`/`mypy`/
+  `isort`; `requirements-dev.txt` не существует; конфигов
+  (`pyproject.toml`, `.flake8`, `.pre-commit-config.yaml`) нет.
+- Отчёт передан владельцу тем же сообщением. Трек 2 (`setup-python-lint`,
+  ruff + informational CI-job на pull_request) — начну отдельным
+  worktree/PR после завершения текущего трека (`scaffold-admin-bot`),
+  чтобы не смешивать два PR в одном рабочем дереве.
+
+### 2026-08-20 — scaffold-admin-bot (Ф-админ-бот, пересмотренный трек 2 после recon-admin-infra)
+- Владелец подтвердил рекомендацию трека 1 (recon-admin-infra, отчёт в
+  предыдущем сообщении): разворачивать в этом репозитории, вторым
+  Railway-сервисом по образцу `webhook` в `docker-compose.yml`. Пересмотрел
+  объём: разведка показала, что почти вся нужная функциональность уже
+  есть в `handlers/admin.py`/`handlers/moderation.py` (только под
+  `DESIGNER_TELEGRAM_ID`) — трек стал «перенести с БД-whitelist», не
+  «построить с нуля».
+- Ветка/worktree: `feat/t-scaffold-admin-bot`,
+  `C:/Projects/_worktrees/vashsad-scaffold-admin-bot`.
+- Новые файлы: `admin_bot.py` (второй бот, свой `ADMIN_BOT_TOKEN`,
+  long-polling, тот же `services.database`, без Redis-FSM — не нужен для
+  маленькой группы админов); `services/admin_auth.py` (таблица
+  `admin_users`: telegram_id/name/role owner|team, `is_admin`/`is_owner`/
+  `add_admin`/`admin_table_empty`/`list_admins`); `handlers/
+  admin_bot_handlers.py` — `/start` (bootstrap: пустая таблица → первый
+  пишущий становится owner), `/add_admin`, `/admins`, и перенесённые
+  байт-в-байт по SQL (только замена проверки доступа) `/stats`,
+  `/orders`+детали+смена статуса, `/update_order`, `/broadcast`,
+  `/broadcast_segment` (9 сегментов), `/ab_stats`, `/ban`, `/unban`,
+  `/whitelist`, `/bans`. Новая команда `/reset_onboarding ID` — раньше
+  нигде не существовала, тривиальный `UPDATE users SET
+  onboarding_done=FALSE`.
+- **Решение по дублированию** (бриф разрешил выбрать): оригинальные
+  команды в `handlers/admin.py`/`moderation.py` **оставлены** в основном
+  боте на переходный период, не убраны в этом PR — вопреки буквальному
+  «перенести, не дублировать». Обоснование: разворачивание `admin_bot`
+  требует нескольких ручных шагов вне git (BotFather → токен, новый
+  Railway-сервис, `ADMIN_BOT_TOKEN`) и RED-паузы; если убрать команды из
+  основного бота сразу, между мержем этого PR и полной ручной настройкой
+  возникает окно, где никто не может воспользоваться `/ban`/`/stats` в
+  проде. Цена временного дублирования кода ниже цены такого окна для
+  живого сервиса с пользователями. Удаление дублей — отдельный маленький
+  трек после подтверждения, что `admin_bot` работает в проде.
+- `docker-compose.yml`: третий сервис `admin_bot` (`command: python
+  admin_bot.py`) по образцу существующего `webhook`. `.env.example` и
+  `CLAUDE.md` — задокументирован `ADMIN_BOT_TOKEN` и новый файл в дереве
+  архитектуры.
+- **Живая проверка** (production DB через `railway run`, синтетические
+  ID `900000001-3`, удалены после теста): `create_admin_users_table()` —
+  создана, повторный вызов идемпотентен; **факт** — реальная таблица
+  `admin_users` на проде пуста (bootstrap сработает на первом настоящем
+  `/start`); `add_admin`/`is_admin`/`is_owner`/`get_admin_role` — верные
+  значения для owner и team (`is_owner` team → `False`); `is_admin` для
+  случайного ID → `False`; `/reset_onboarding` — «до» `TRUE` → «после»
+  `FALSE` через `UPDATE ... RETURNING`. Синтетические строки удалены,
+  подтверждено пустым результатом после чистки. SQL перенесённых команд
+  отдельно не гонял — это байт-в-байт код, уже работающий в проде сегодня
+  под `handlers/admin.py`/`moderation.py`.
+- **Побочная находка**: `/reset_onboarding` сейчас не имеет
+  поведенческого эффекта — вызов онбординг-квиза закомментирован в
+  `handlers/start.py` с 11.08 (F1.2-STOP), флаг `onboarding_done` никто
+  не читает. Команда реализована как просили (технически рабочая), эффект
+  появится только если квиз когда-нибудь включат обратно.
+- **Вне рамок этого PR** (по прямой инструкции владельца): правка
+  `notifyDesigner()` в `vashsad-miniapp/app/api/order/route.ts` для
+  отправки уведомлений также в `admin_bot` по списку `admin_users` — не
+  делал, отдельный бриф в сессию miniapp после готовности этого трека.
+- PR: github.com/beaver20007/vashsad-bot/pull/12, `CLEAN`/`MERGEABLE`.
+  Инструкция BotFather (имя «ВашСад Админ», username
+  `vashsad_admin_bot`, куда вписывать токен) — в теле PR. Не смёржен —
+  RED-класс (новый прод-компонент с доступом к пользовательским данным),
+  ждёт слова владельца. Деплой в любом случае требует ручного участия
+  владельца (создание Railway-сервиса, токен из BotFather) сверх мержа.
