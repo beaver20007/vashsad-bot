@@ -18,7 +18,7 @@ import aiohttp
 
 from handlers.admin_bot_handlers import router as admin_bot_router
 from services.database import init_db, close_db
-from services.admin_auth import create_admin_users_table
+from services.admin_auth import create_admin_users_table, ensure_order_reply_column
 
 load_dotenv()
 
@@ -26,10 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 
-async def main():
-    await init_db()
-    await create_admin_users_table()
-
+def _make_session() -> AiohttpSession:
     # SSL (тот же Railway quirk, что в bot.py)
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
@@ -38,10 +35,30 @@ async def main():
     session = AiohttpSession()
     session._connector_type = aiohttp.TCPConnector
     session._connector_init = {"ssl": ssl_context}
+    return session
+
+
+async def main():
+    await init_db()
+    await create_admin_users_table()
+    await ensure_order_reply_column()
 
     bot = Bot(
         token=os.getenv("ADMIN_BOT_TOKEN"),
-        session=session,
+        session=_make_session(),
+    )
+
+    # Второй Bot-инстанс на токене ОСНОВНОГО бота — только для отправки
+    # сообщений клиентам (never polling). Клиенты никогда не писали
+    # admin_bot'у (ADMIN_BOT_TOKEN) — Telegram не разрешит боту первым
+    # написать пользователю, который с ним не переписывался. Все
+    # клиент-адресованные сообщения (ответ на заявку, смена статуса,
+    # /broadcast, /broadcast_segment) должны уходить через main_bot,
+    # т.к. только с TELEGRAM_BOT_TOKEN у клиентов есть открытый чат
+    # (см. трек admin-bot-layer-a-workflow).
+    main_bot = Bot(
+        token=os.getenv("TELEGRAM_BOT_TOKEN"),
+        session=_make_session(),
     )
 
     dp = Dispatcher()
@@ -49,8 +66,10 @@ async def main():
 
     try:
         log.info("🔐 ВашСад Админ-бот запущен")
-        await dp.start_polling(bot, skip_updates=True)
+        await dp.start_polling(bot, main_bot=main_bot, skip_updates=True)
     finally:
+        await bot.session.close()
+        await main_bot.session.close()
         await close_db()
 
 

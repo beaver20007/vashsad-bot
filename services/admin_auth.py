@@ -19,6 +19,18 @@ async def create_admin_users_table() -> None:
         """)
 
 
+async def ensure_order_reply_column() -> None:
+    """orders.replied — отдельно от status: "ответили клиенту хотя бы раз",
+    не смешивается со статусом заявки (new/in_progress/review/done/canceled),
+    который остаётся клиентским жизненным циклом. Нужно для фильтра
+    "Отвечено" в /orders админ-бота (трек admin-bot-layer-a-workflow)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS replied BOOLEAN DEFAULT FALSE"
+        )
+
+
 async def is_admin(telegram_id: int) -> bool:
     pool = await get_pool()
     async with pool.acquire() as conn:
