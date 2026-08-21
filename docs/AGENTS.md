@@ -8,7 +8,7 @@
 
 | Трек | Ветка | Worktree | Статус | Дата |
 |---|---|---|---|---|
-| scaffold-admin-bot | `feat/t-scaffold-admin-bot` | `C:/Projects/_worktrees/vashsad-scaffold-admin-bot` | PR открыт, ждёт мержа владельцем | 2026-08-20 |
+| scaffold-admin-bot | `feat/t-scaffold-admin-bot` | `C:/Projects/_worktrees/vashsad-scaffold-admin-bot` | PR #12 открыт, ждёт мержа владельцем | 2026-08-20 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
