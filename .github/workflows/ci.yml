@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Informational: continue-on-error, не блокирует мерж — на 21.08.2026
+  # известно 6 преюдиционных сбоев (handlers.promo._pool, FAQ-регионы),
+  # не связанных с содержимым конкретного PR (см. PR #15, recon-python-
+  # lint-ci). Не плодим вечно-красный статус с первого дня, по тому же
+  # решению, что Playwright e2e в vashsad-miniapp (ci.yml там же).
+  test:
+    name: pytest (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest tests/ --tb=short -q
