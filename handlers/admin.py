@@ -375,9 +375,30 @@ async def cmd_ab_stats(message: Message):
 
 # ---------------------------------------------------------------------------
 # /broadcast_segment — сегментированная рассылка (только дизайнер)
+#
+# Региональные сегменты чинены треком fix-broadcast-region-segments
+# (2026-08-21): раньше искали название ОБЛАСТИ (Нижегородская/Владимирская/
+# Московская), которую в БД никто никогда не пишет — реальные значения
+# users.region это макрорегионы из REGION_OPTIONS в vashsad-miniapp/
+# components/OnboardingFlow.tsx. Все 3 старых фильтра гарантированно давали
+# 0 получателей — подтверждено запросом к прод-БД (admin-tools-honesty-audit).
+# Список сегментов теперь = точный словарь REGION_OPTIONS, сравнение точным
+# равенством. Тот же фикс применён к handlers/admin_bot_handlers.py (там
+# идентичный код, дублирован транзитно с PR #12).
 # ---------------------------------------------------------------------------
 
 _pending_segments: dict[int, dict] = {}
+
+# slug -> точное значение users.region, как пишет OnboardingFlow.tsx (miniapp)
+REGION_SEGMENTS: dict[str, str] = {
+    "region_msk":      "Москва и область",
+    "region_central":  "Центральная Россия",
+    "region_nw":       "Северо-Запад",
+    "region_south":    "Юг России",
+    "region_siberia":  "Сибирь / Урал",
+    "region_fareast":  "Дальний Восток",
+    "region_other":    "Другой регион",
+}
 
 
 @router.message(Command("broadcast_segment"))
@@ -389,9 +410,10 @@ async def cmd_broadcast_segment(message: Message):
         [InlineKeyboardButton(text="⭐ Только подписчики", callback_data="bseg:subscribed")],
         [InlineKeyboardButton(text="🌟 Подписчики Stars", callback_data="bseg:stars_subscribers")],
         [InlineKeyboardButton(text="📋 Есть заявки", callback_data="bseg:with_orders")],
-        [InlineKeyboardButton(text="📍 Нижегородская область", callback_data="bseg:region_нижегородская")],
-        [InlineKeyboardButton(text="📍 Владимирская область", callback_data="bseg:region_владимирская")],
-        [InlineKeyboardButton(text="📍 Московская область", callback_data="bseg:region_московская")],
+        *[
+            [InlineKeyboardButton(text=f"📍 {value}", callback_data=f"bseg:{slug}")]
+            for slug, value in REGION_SEGMENTS.items()
+        ],
         [InlineKeyboardButton(text="🆕 Новые (7 дней)", callback_data="bseg:new_7d")],
         [InlineKeyboardButton(text="😴 Неактивные (30 дней)", callback_data="bseg:inactive_30d")],
         [InlineKeyboardButton(text="👥 Все пользователи", callback_data="bseg:all")],
@@ -413,12 +435,10 @@ async def cb_segment_chosen(callback: CallbackQuery):
         'subscribed': 'подписчики',
         'stars_subscribers': 'подписчики Stars (активная подписка)',
         'with_orders': 'пользователи с заявками',
-        'region_нижегородская': 'Нижегородская обл.',
-        'region_владимирская': 'Владимирская обл.',
-        'region_московская': 'Московская обл.',
         'new_7d': 'новые за 7 дней',
         'inactive_30d': 'неактивные 30 дней',
         'all': 'все пользователи',
+        **{slug: value for slug, value in REGION_SEGMENTS.items()},
     }
     label = segment_labels.get(segment, segment)
     await callback.message.edit_text(
@@ -450,9 +470,11 @@ async def receive_segment_text(message: Message):
                    JOIN orders o ON o.telegram_id = u.telegram_id
                    WHERE (u.is_banned IS NOT TRUE)"""
             )
-        elif segment.startswith('region_'):
-            region = segment.replace('region_', '')
-            users = await conn.fetch("SELECT telegram_id FROM users WHERE region ILIKE $1 AND (is_banned IS NOT TRUE)", f"%{region}%")
+        elif segment in REGION_SEGMENTS:
+            users = await conn.fetch(
+                "SELECT telegram_id FROM users WHERE region = $1 AND (is_banned IS NOT TRUE)",
+                REGION_SEGMENTS[segment],
+            )
         elif segment == 'new_7d':
             users = await conn.fetch("SELECT telegram_id FROM users WHERE created_at > NOW() - INTERVAL '7 days' AND (is_banned IS NOT TRUE)")
         elif segment == 'inactive_30d':
