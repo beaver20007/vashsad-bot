@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | Статус | Дата |
+|---|---|---|---|---|
+| fix-broadcast-region-segments | `fix/t-broadcast-region-segments` | `C:/Projects/_worktrees/vashsad-fix-broadcast-regions` | PR #14 открыт, ждёт мержа владельцем | 2026-08-21 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
