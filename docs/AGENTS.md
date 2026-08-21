@@ -8,7 +8,7 @@
 
 | Трек | Ветка | Worktree | Статус | Дата |
 |---|---|---|---|---|
-| add-pr-ci-workflow | `fix/t-bot-pr-ci` | `C:/Projects/_worktrees/vashsad-add-pr-ci` | PR открыт, ждёт мержа владельцем | 2026-08-21 |
+| add-pr-ci-workflow | `fix/t-bot-pr-ci` | `C:/Projects/_worktrees/vashsad-add-pr-ci` | PR #16 открыт, ждёт мержа владельцем | 2026-08-21 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
