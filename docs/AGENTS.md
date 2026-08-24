@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | Статус | Дата |
-|---|---|---|---|---|
-| fix-welcome-text-update | `fix/t-welcome-text-update` | `C:/Projects/_worktrees/vashsad-fix-welcome-text` | PR #17 открыт, ждёт мержа владельцем | 2026-08-23 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| fix-welcome-text-update | `fix/t-welcome-text-update` | #17, `581eed1` | 2026-08-24 |
 | add-pr-ci-workflow | `fix/t-bot-pr-ci` | #16, `0aa6bab` | 2026-08-21 |
 | cleanup-admin-dupes | `chore/t-cleanup-admin-dupes` | #15, `3468f80` | 2026-08-21 |
 | fix-broadcast-region-segments | `fix/t-broadcast-region-segments` | #14, `2c02c18` | 2026-08-21 |
