@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | Статус | Дата |
+|---|---|---|---|---|
+| fix-welcome-text-update | `fix/t-welcome-text-update` | `C:/Projects/_worktrees/vashsad-fix-welcome-text` | PR открыт, ждёт мержа владельцем | 2026-08-23 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
