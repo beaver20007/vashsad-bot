@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | PR |
+|---|---|---|---|
+| ruff-setup | `chore/t-ruff-setup` | `C:/Projects/_worktrees/vashsad-ruff-setup` | #22 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
@@ -39,7 +41,6 @@
 - `feat/max-integration` — на СТОПе по решению владельца, не смёржена в main
   (`git branch --no-merged main`). Не удалять, не мержить.
 - `origin/rescue/pre-orchestrator-20260725` — не смёржена в main. Не трогать.
-- `origin/backup/home-copy-20260731` — технически 0 уникальных коммитов
-  относительно main (была источником fast-forward мержа 04.08), но её
-  уборка отмечена в docs/ORCHESTRATOR.md как «отдельное решение» —
-  сознательно не удалена в этом проходе, см. ORCHESTRATOR.md.
+- `origin/backup/home-copy-20260731` — **удалена** 2026-08-26 после повторной
+  проверки (`git merge-base` = tip ветки, 0 уникальных коммитов, тот же
+  результат, что и в старой записи). См. docs/ORCHESTRATOR.md.
