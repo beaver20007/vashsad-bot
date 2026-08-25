@@ -87,7 +87,55 @@ class TestCheckFaq:
 
 
 # ---------------------------------------------------------------------------
-# 2. Referral code generation — services/database.py :: _make_referral_code
+# 2. Welcome A/B variant selection — handlers/start.py :: _variant_for
+# ---------------------------------------------------------------------------
+
+class TestWelcomeAbVariant:
+    """Tests for the sticky A/B variant picker used for the /start welcome text."""
+
+    @pytest.fixture(autouse=True)
+    def _import(self):
+        try:
+            from handlers.start import _variant_for, _welcome_text_for
+            self._variant_for = _variant_for
+            self._welcome_text_for = _welcome_text_for
+        except ImportError as exc:
+            pytest.skip(f"Could not import handlers.start: {exc}")
+
+    def test_variant_is_sticky_for_same_user(self):
+        user_id = 918273645
+        results = [self._variant_for(user_id) for _ in range(5)]
+        assert len(set(results)) == 1, "Same user_id must always get the same variant"
+
+    def test_variant_is_a_or_b(self):
+        assert self._variant_for(1) in ("A", "B")
+
+    def test_variant_distribution_roughly_even(self):
+        results = [self._variant_for(uid) for uid in range(1, 1001)]
+        share_a = results.count("A") / len(results)
+        assert 0.45 <= share_a <= 0.55, f"Variant A share {share_a:.3f} is skewed"
+
+    def test_welcome_text_matches_assigned_variant(self):
+        from services.i18n import t
+        import config
+
+        even_id, odd_id = 918273644, 918273645
+        assert self._variant_for(even_id) == "A"
+        assert self._variant_for(odd_id) == "B"
+
+        expected_a = t("welcome_a", "ru").format(
+            bot_name=config.BOT_NAME, designer_name=config.DESIGNER_NAME_GEN
+        )
+        expected_b = t("welcome_b", "ru").format(
+            bot_name=config.BOT_NAME, designer_name=config.DESIGNER_NAME_GEN
+        )
+        assert self._welcome_text_for(even_id, "ru") == expected_a
+        assert self._welcome_text_for(odd_id, "ru") == expected_b
+        assert expected_a != expected_b
+
+
+# ---------------------------------------------------------------------------
+# 3. Referral code generation — services/database.py :: _make_referral_code
 # ---------------------------------------------------------------------------
 
 class TestReferralCode:

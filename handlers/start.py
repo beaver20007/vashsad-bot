@@ -41,44 +41,28 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 # ── A/B тест приветствия (фаза 3) ───────────────────────────
-_AB_VARIANT_A = """🌿 <b>Добро пожаловать в {bot_name}!</b>
-
-Я — AI-помощник {designer_name}, дипломированного ландшафтного дизайнера.
-
-Помогу вам:
-🗺 Создать план вашего участка
-🌱 Подобрать растения под ваш климат и стиль
-📸 Определить болезнь растения по фото
-📅 Составить календарь ухода за садом
-💬 Ответить на любой вопрос по садоводству
-
-<b>Выберите, с чего начнём 👇</b>"""
-
-_AB_VARIANT_B = """🌿 <b>{bot_name} — сад вашей мечты</b>
-
-{designer_name} помогает создавать природные сады в Нижегородской и Владимирской областях.
-
-Что я умею:
-✨ Составить план участка с нуля
-🌱 Подобрать растения под ваш климат
-📸 Диагностировать болезни по фото
-💡 Ответить на любой вопрос о саде
-
-🎁 <b>10 бесплатных AI-консультаций</b> для новых пользователей!
-
-<b>Открывайте приложение и начнём 👇</b>"""
-
+# Тексты вариантов живут в services/i18n.py (ключи welcome_a / welcome_b) —
+# единственный источник, чтобы не дублировать текст в двух местах.
 _AB_STATS: dict[str, int] = {"A": 0, "B": 0, "A_orders": 0, "B_orders": 0}
 
 
-def _pick_ab_variant(telegram_id: int) -> tuple[str, str]:
-    """Детерминированный выбор варианта по telegram_id (чётный = A, нечётный = B)."""
-    variant = "A" if telegram_id % 2 == 0 else "B"
+def _variant_for(telegram_id: int) -> str:
+    """Детерминированный, липкий выбор варианта по telegram_id (чётный = A, нечётный = B)."""
+    return "A" if telegram_id % 2 == 0 else "B"
+
+
+def _pick_ab_variant(telegram_id: int) -> str:
+    """Как _variant_for, но также учитывает показ в _AB_STATS (используется в /start)."""
+    variant = _variant_for(telegram_id)
     _AB_STATS[variant] += 1
-    return variant, (_AB_VARIANT_A if variant == "A" else _AB_VARIANT_B)
+    return variant
 
 
-WELCOME_TEXT = _AB_VARIANT_A  # fallback для cb_main_menu
+def _welcome_text_for(telegram_id: int, lang: str = "ru") -> str:
+    """Реально отправляемый текст приветствия для данного пользователя и языка."""
+    variant = _variant_for(telegram_id)
+    key = "welcome_a" if variant == "A" else "welcome_b"
+    return t(key, lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
 
 
 def mini_app_keyboard() -> InlineKeyboardMarkup:
@@ -178,7 +162,7 @@ async def cmd_start(message: Message, state: FSMContext):
     # await maybe_start_onboarding(message, state, message.from_user.id)
 
     # A/B тест приветствия
-    variant, ab_text = _pick_ab_variant(message.from_user.id)
+    variant = _pick_ab_variant(message.from_user.id)
 
     # Определяем новый ли пользователь (created_at в пределах 30 сек от now)
     from datetime import timezone
@@ -204,7 +188,8 @@ async def cmd_start(message: Message, state: FSMContext):
 
     name = user.first_name or ("friend" if user.lang == "en" else "друг")
     greeting = "👋 Hello, {name}!\n\n" if user.lang == "en" else "👋 Привет, {name}!\n\n"
-    welcome_text = t("welcome", user.lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
+    welcome_key = "welcome_a" if variant == "A" else "welcome_b"
+    welcome_text = t(welcome_key, user.lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
     caption = greeting.format(name=name) + welcome_text
     if WELCOME_IMAGE_URL:
         await message.answer_photo(
@@ -256,7 +241,7 @@ async def cmd_help(message: Message):
 @router.callback_query(F.data == "menu:main")
 async def cb_main_menu(callback: CallbackQuery):
     await callback.message.edit_text(
-        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN),
+        _welcome_text_for(callback.from_user.id),
         reply_markup=mini_app_keyboard(),
         parse_mode="HTML",
     )
@@ -266,7 +251,7 @@ async def cb_main_menu(callback: CallbackQuery):
 @router.callback_query(F.data == "cancel")
 async def cb_cancel(callback: CallbackQuery):
     await callback.message.edit_text(
-        WELCOME_TEXT.format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN),
+        _welcome_text_for(callback.from_user.id),
         reply_markup=mini_app_keyboard(),
         parse_mode="HTML",
     )
