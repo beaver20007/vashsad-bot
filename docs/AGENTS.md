@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | PR |
+|---|---|---|---|
+| welcome-ab-test-real | `feat/t-welcome-ab-test-real` | `C:/Projects/_worktrees/vashsad-welcome-ab` | #18 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
