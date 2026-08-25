@@ -6,16 +6,15 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | PR |
-|---|---|---|---|
-| bot-consent-start | `fix/t-bot-consent-start` | `C:/Projects/_worktrees/vashsad-consent-start` | #19 |
-| bot-consent-booking | `fix/t-bot-consent-booking` | `C:/Projects/_worktrees/vashsad-consent-booking` | #20 |
-| sentry-scrub-locals | `fix/t-sentry-scrub-locals` | `C:/Projects/_worktrees/vashsad-sentry-scrub` | #21 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| sentry-scrub-locals | `fix/t-sentry-scrub-locals` | #21, `2d6f1cd` | 2026-08-25 |
+| bot-consent-booking | `fix/t-bot-consent-booking` | #20, `02bddd1` | 2026-08-25 |
+| bot-consent-start | `fix/t-bot-consent-start` | #19, `b540951` | 2026-08-25 |
 | welcome-ab-test-real | `feat/t-welcome-ab-test-real` | #18, `1e7f9a0` | 2026-08-25 |
 | fix-welcome-text-update | `fix/t-welcome-text-update` | #17, `581eed1` | 2026-08-24 |
 | add-pr-ci-workflow | `fix/t-bot-pr-ci` | #16, `0aa6bab` | 2026-08-21 |

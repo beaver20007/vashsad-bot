@@ -1507,3 +1507,35 @@
 - Все три PR открыты, CI (`pytest (informational)`) → `pass` на всех трёх
   (`gh pr checks 19/20/21`). Мерж и деплой — только по отдельному явному
   слову владельца (ещё не получено на момент этой записи).
+
+### 2026-08-25 — PR #19/#20/#21 мерж и деплой на прод
+- Владелец подтвердил одним сообщением мерж всех трёх PR + деплой,
+  порядок — любой, конфликтов между ними нет (подтверждено заранее в
+  отчёте по ФАЙЛЫ/зонам правок).
+- Мержил последовательно, каждый раз дожидаясь `mergeStateStatus: CLEAN`
+  (`UNKNOWN` → `CLEAN` через ~5-6 сек, обычный паттерн GitHub):
+  - PR #19 → `gh pr merge 19 --merge --delete-branch` → merge commit
+    `b540951`, `state: MERGED`.
+  - PR #20 → аналогично → `02bddd1`. `gh pr diff 20 --name-only` — только
+    `handlers/booking.py` и `tests/test_e2e_flow.py`, конфликта с #19 не
+    было (разные файлы).
+  - PR #21 → аналогично → `2d6f1cd`. Затрагивал `bot.py`, как и #19
+    (импорт + регистрация `PdnConsentMiddleware` vs Sentry `init()`) —
+    GitHub смержил без конфликта (разные строки), диф после
+    `git merge --ff-only` показывает оба изменения бок о бок.
+- Локальный `main`: fast-forward `c8cb6f5..2d6f1cd` (6 коммитов). Все три
+  worktree и локальные ветки убраны.
+- **Живой деплой**: `railway status` → `vashsad-bot` `Online`, новый
+  `deployment ID` `57e15871...` (отличается от предыдущего
+  `6cad23e2...`). `railway logs --lines 30`: чистый рестарт (21:19:48-50
+  UTC) — «✅ Таблицы созданы / проверены» подтверждает, что миграция
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS pdn_consent_at TIMESTAMP`
+  прошла без ошибок при старте; планировщик поднял все задачи, `Start
+  polling`, `Run polling for bot @washsad_ai_bot` — без единой ошибки в
+  логе (в частности, `PdnConsentMiddleware` и новый `sentry_sdk.init(...,
+  include_local_variables=False)` не уронили процесс на импорте/старте).
+- **Итог**: закрытие пункта 2 аудита 152-ФЗ (согласие на ПДн — общее в
+  /start + отдельное перед вводом телефона в booking.py) и Sentry-фикс
+  (`include_local_variables=False`) реально в проде с 25.08 21:19 UTC.
+  `docs/audit/152fz-audit-bot-20260825.md` актуален (статусы закрытия уже
+  проставлены при создании файла).
