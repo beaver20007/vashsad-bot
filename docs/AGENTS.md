@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | PR |
-|---|---|---|---|
-| welcome-ab-test-real | `feat/t-welcome-ab-test-real` | `C:/Projects/_worktrees/vashsad-welcome-ab` | #18 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| welcome-ab-test-real | `feat/t-welcome-ab-test-real` | #18, `1e7f9a0` | 2026-08-25 |
 | fix-welcome-text-update | `fix/t-welcome-text-update` | #17, `581eed1` | 2026-08-24 |
 | add-pr-ci-workflow | `fix/t-bot-pr-ci` | #16, `0aa6bab` | 2026-08-21 |
 | cleanup-admin-dupes | `chore/t-cleanup-admin-dupes` | #15, `3468f80` | 2026-08-21 |

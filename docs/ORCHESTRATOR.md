@@ -1429,3 +1429,28 @@
 - PR: github.com/beaver20007/vashsad-bot/pull/18. Мерж и деплой —
   только по отдельному явному слову владельца (ещё не получено на
   момент этой записи).
+
+### 2026-08-25 — PR #18 мерж и деплой на прод
+- Владелец подтвердил: «мерджи PR #18 (feat/t-welcome-ab-test-real) в
+  main и деплой на прод».
+- Проверка перед мержем: `gh pr view 18` → `CLEAN`/`MERGEABLE`.
+  `gh pr diff 18 --name-only` — ровно 4 файла, совпадают с коммитом
+  трека (`handlers/start.py`, `services/i18n.py`,
+  `tests/test_e2e_flow.py`, `tests/test_handlers.py`) — чужих
+  коммитов в базе нет.
+  `gh pr merge 18 --merge --delete-branch` → `state: MERGED`, merge
+  commit `1e7f9a0`, remote-ветка удалена.
+- Локальный `main`: fast-forward `e96613b..1e7f9a0`. Worktree
+  (`C:/Projects/_worktrees/vashsad-welcome-ab`) и локальная ветка
+  убраны.
+- **Живой деплой**: `railway status` → `vashsad-bot` `Online`, новый
+  `deployment ID` `6cad23e2...` (отличается от предыдущего
+  `ed14cadc...` из PR #17 — подтверждает, что задеплоился именно этот
+  пуш). `railway logs --lines 30`: чистый рестарт (07:43:20-22 UTC),
+  PostgreSQL подключён, планировщик поднял все задачи, `Start
+  polling`, `Run polling for bot @washsad_ai_bot` — без единой
+  ошибки.
+- **Итог**: реальный A/B-тест приветствия («липкий» выбор варианта по
+  telegram_id, `welcome_a`/`welcome_b` из `services/i18n.py`, метка
+  `ab_variant` в аналитике теперь соответствует отправленному тексту)
+  в проде с 25.08 07:43 UTC.
