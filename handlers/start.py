@@ -1,5 +1,6 @@
 """Хендлер /start — приветствие, главное меню + кнопка Mini App"""
 import os
+from datetime import datetime, timezone
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
@@ -15,7 +16,7 @@ from config import (
     FREE_CHAT_LIMIT, FREE_PHOTO_LIMIT, FREE_PLANTS_LIMIT,
 )
 from keyboards import main_menu_keyboard, back_to_menu_keyboard
-from services.database import get_or_create_user, insert_analytics_event
+from services.database import get_or_create_user, insert_analytics_event, set_pdn_consent
 from services.i18n import t
 
 SCREEN_LINKS = {
@@ -65,6 +66,79 @@ def _welcome_text_for(telegram_id: int, lang: str = "ru") -> str:
     return t(key, lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
 
 
+# ── Согласие на обработку ПДн (152-ФЗ) — обязательный шаг перед первым использованием ──
+PDN_CONSENT_TEXT = (
+    "🔒 <b>Обработка персональных данных</b>\n\n"
+    "Прежде чем продолжить, подтвердите согласие на обработку персональных "
+    "данных: имени и username из Telegram, истории обращений к боту, а при "
+    "оформлении консультации — номера телефона. Обработка ведётся в целях "
+    "оказания услуг ландшафтного дизайна.\n\n"
+    "Полный текст политики обработки персональных данных находится в "
+    "разработке и будет опубликован дополнительно; актуальный текст можно "
+    "запросить у {designer_name}.\n\n"
+    "Без согласия бот, к сожалению, не сможет продолжить работу."
+)
+
+
+def pdn_consent_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Согласен(на) на обработку персональных данных",
+            callback_data="pdn:consent_start",
+        )
+    )
+    return builder.as_markup()
+
+
+async def _send_welcome(target, telegram_id: int, user) -> None:
+    """Показывает приветствие (A/B-вариант) + подсказку по меню.
+    target — Message или CallbackQuery.message (у обоих есть .answer()/.answer_photo())."""
+    variant = _pick_ab_variant(telegram_id)
+
+    # Определяем нового ли пользователя (created_at в пределах 30 сек от now)
+    now_utc = datetime.now(timezone.utc)
+    is_new_user = False
+    if user.created_at:
+        created = user.created_at
+        if created.tzinfo is None:
+            delta = abs((datetime.utcnow() - created).total_seconds())
+        else:
+            delta = abs((now_utc - created).total_seconds())
+        is_new_user = delta < 30
+
+    # Трекинг события /start
+    import asyncio as _asyncio
+    _asyncio.ensure_future(insert_analytics_event(
+        telegram_id=telegram_id,
+        event_name="start",
+        params={"ab_variant": variant, "is_new_user": is_new_user},
+    ))
+
+    name = user.first_name or ("friend" if user.lang == "en" else "друг")
+    greeting = "👋 Hello, {name}!\n\n" if user.lang == "en" else "👋 Привет, {name}!\n\n"
+    welcome_key = "welcome_a" if variant == "A" else "welcome_b"
+    welcome_text = t(welcome_key, user.lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
+    caption = greeting.format(name=name) + welcome_text
+    if WELCOME_IMAGE_URL:
+        await target.answer_photo(
+            photo=WELCOME_IMAGE_URL,
+            caption=caption,
+            reply_markup=mini_app_keyboard(),
+            parse_mode="HTML",
+        )
+    else:
+        await target.answer(
+            caption,
+            reply_markup=mini_app_keyboard(),
+            parse_mode="HTML",
+        )
+    await target.answer(
+        t("menu_hint", user.lang),
+        reply_markup=MAIN_KEYBOARD,
+    )
+
+
 def mini_app_keyboard() -> InlineKeyboardMarkup:
     """Кнопка открытия Mini App + основное меню."""
     builder = InlineKeyboardBuilder()
@@ -98,6 +172,15 @@ async def cmd_start(message: Message, state: FSMContext):
         first_name=message.from_user.first_name,
         language_code=message.from_user.language_code,
     )
+
+    # 152-ФЗ: без согласия на обработку ПДн дальше не пускаем
+    if user.pdn_consent_at is None:
+        await message.answer(
+            PDN_CONSENT_TEXT.format(designer_name=DESIGNER_NAME_GEN),
+            reply_markup=pdn_consent_keyboard(),
+            parse_mode="HTML",
+        )
+        return
 
     # Deep link / реферальный payload
     args = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else ''
@@ -161,53 +244,20 @@ async def cmd_start(message: Message, state: FSMContext):
     # from handlers.onboarding import maybe_start_onboarding
     # await maybe_start_onboarding(message, state, message.from_user.id)
 
-    # A/B тест приветствия
-    variant = _pick_ab_variant(message.from_user.id)
+    # A/B тест приветствия + основное меню
+    await _send_welcome(message, message.from_user.id, user)
 
-    # Определяем новый ли пользователь (created_at в пределах 30 сек от now)
-    from datetime import timezone
-    now_utc = message.date
-    is_new_user = False
-    if user.created_at:
-        created = user.created_at
-        if created.tzinfo is None:
-            # naive datetime — сравниваем с now() тоже naive
-            from datetime import datetime as _dt
-            delta = abs((_dt.utcnow() - created).total_seconds())
-        else:
-            delta = abs((now_utc - created).total_seconds())
-        is_new_user = delta < 30
 
-    # Трекинг события /start
-    import asyncio as _asyncio
-    _asyncio.ensure_future(insert_analytics_event(
-        telegram_id=message.from_user.id,
-        event_name="start",
-        params={"ab_variant": variant, "is_new_user": is_new_user},
-    ))
-
-    name = user.first_name or ("friend" if user.lang == "en" else "друг")
-    greeting = "👋 Hello, {name}!\n\n" if user.lang == "en" else "👋 Привет, {name}!\n\n"
-    welcome_key = "welcome_a" if variant == "A" else "welcome_b"
-    welcome_text = t(welcome_key, user.lang).format(bot_name=BOT_NAME, designer_name=DESIGNER_NAME_GEN)
-    caption = greeting.format(name=name) + welcome_text
-    if WELCOME_IMAGE_URL:
-        await message.answer_photo(
-            photo=WELCOME_IMAGE_URL,
-            caption=caption,
-            reply_markup=mini_app_keyboard(),
-            parse_mode="HTML",
-        )
-    else:
-        await message.answer(
-            caption,
-            reply_markup=mini_app_keyboard(),
-            parse_mode="HTML",
-        )
-    await message.answer(
-        t("menu_hint", user.lang),
-        reply_markup=MAIN_KEYBOARD,
-    )
+@router.callback_query(F.data == "pdn:consent_start")
+async def cb_pdn_consent_start(callback: CallbackQuery):
+    """Подтверждение согласия на обработку ПДн — фиксируем и показываем обычный /start."""
+    user = await set_pdn_consent(callback.from_user.id)
+    await callback.answer("Спасибо! Согласие сохранено ✅")
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await _send_welcome(callback.message, callback.from_user.id, user)
 
 
 @router.message(Command("help"))

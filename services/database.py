@@ -209,6 +209,8 @@ async def _create_tables() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS push_subscription JSONB",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS garden_photo_url TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS season_plan TEXT",
+            # 152-ФЗ: факт согласия на обработку ПДн (NULL = не дано)
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS pdn_consent_at TIMESTAMP",
         ]:
             try:
                 await conn.execute(col_sql)
@@ -257,6 +259,7 @@ class User:
     referred_by: Optional[int] = None
     bonus_messages: int = 0
     lang: str = "ru"
+    pdn_consent_at: Optional[datetime] = None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -322,6 +325,7 @@ async def get_or_create_user(
         referred_by=row.get("referred_by"),
         bonus_messages=row.get("bonus_messages") or 0,
         lang=row.get("lang") or "ru",
+        pdn_consent_at=row.get("pdn_consent_at"),
     )
 
 
@@ -329,6 +333,16 @@ def get_user(telegram_id: int) -> Optional[User]:
     """Синхронная обёртка для совместимости — лучше использовать async версию."""
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(get_or_create_user(telegram_id))
+
+
+async def set_pdn_consent(telegram_id: int) -> User:
+    """Фиксирует согласие пользователя на обработку ПДн (152-ФЗ) и возвращает актуального User."""
+    async with _pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET pdn_consent_at=NOW(), updated_at=NOW() WHERE telegram_id=$1",
+            telegram_id,
+        )
+    return await get_or_create_user(telegram_id)
 
 
 async def update_user(user: User) -> None:

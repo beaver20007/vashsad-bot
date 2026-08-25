@@ -29,6 +29,7 @@ from handlers.booking import router as booking_router
 from handlers.promo import router as promo_router
 from handlers.inline_mode import router as inline_router
 from handlers.moderation import BanCheckMiddleware
+from handlers.consent import PdnConsentMiddleware
 from handlers.rate_limit import RateLimitMiddleware
 from handlers.export import router as export_router
 from handlers.payment_stars import router as payment_stars_router
@@ -86,6 +87,8 @@ async def main():
     # Порядок важен! FSM-роутеры ДО chat_router
     dp.message.middleware(BanCheckMiddleware())
     dp.callback_query.middleware(BanCheckMiddleware())
+    dp.message.middleware(PdnConsentMiddleware())
+    dp.callback_query.middleware(PdnConsentMiddleware())
     dp.message.middleware(RateLimitMiddleware(limit=20, window=60))
 
     dp.include_routers(
