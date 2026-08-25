@@ -361,6 +361,60 @@ class TestBotFlow:
         assert "найден" in result["reason"].lower() or "not found" in result["reason"].lower()
 
 
+class TestBookingPhoneConsent:
+    """152-ФЗ: перед вводом телефона в booking.py — отдельное подтверждение."""
+
+    @pytest.mark.asyncio
+    async def test_slot_pick_asks_phone_consent_not_phone(self, mock_pool):
+        """Выбор слота ведёт на экран согласия на передачу телефона,
+        а НЕ сразу в состояние ожидания номера."""
+        pool, conn = mock_pool
+        conn.fetchrow = AsyncMock(return_value={"slot_dt": datetime(2026, 9, 1, 10, 0)})
+
+        callback = MagicMock()
+        callback.data = "book_slot:7"
+        callback.from_user = MagicMock(id=42)
+        callback.answer = AsyncMock()
+        callback.message = MagicMock()
+        callback.message.edit_text = AsyncMock()
+
+        state = AsyncMock()
+        state.update_data = AsyncMock()
+        state.set_state = AsyncMock()
+
+        with patch("handlers.booking.get_pool", new_callable=AsyncMock, return_value=pool):
+            from handlers.booking import cb_book_slot, BookingForm
+            await cb_book_slot(callback, state)
+
+        state.set_state.assert_called_once_with(BookingForm.waiting_phone_consent)
+        text, kwargs = callback.message.edit_text.call_args.args, callback.message.edit_text.call_args.kwargs
+        shown_text = text[0] if text else kwargs.get("text", "")
+        assert "телефон" in shown_text.lower()
+        assert "reply_markup" in kwargs
+        buttons = kwargs["reply_markup"].inline_keyboard
+        callback_datas = [b.callback_data for row in buttons for b in row]
+        assert "book_phone_consent:accept" in callback_datas, (
+            "Consent screen must offer the phone-consent confirm button"
+        )
+
+    @pytest.mark.asyncio
+    async def test_phone_consent_accept_unlocks_contact_state(self):
+        """После подтверждения — переход в waiting_contact, только тогда
+        бот готов принять номер телефона."""
+        callback = MagicMock()
+        callback.answer = AsyncMock()
+        callback.message = MagicMock()
+        callback.message.edit_text = AsyncMock()
+
+        state = AsyncMock()
+        state.set_state = AsyncMock()
+
+        from handlers.booking import cb_book_phone_consent, BookingForm
+        await cb_book_phone_consent(callback, state)
+
+        state.set_state.assert_called_once_with(BookingForm.waiting_contact)
+
+
 # ---------------------------------------------------------------------------
 # Standalone unit tests (no class needed but kept for grouping)
 # ---------------------------------------------------------------------------

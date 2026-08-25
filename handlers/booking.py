@@ -17,9 +17,10 @@ log = logging.getLogger(__name__)
 
 
 class BookingForm(StatesGroup):
-    waiting_service = State()
-    waiting_slot    = State()
-    waiting_contact = State()
+    waiting_service       = State()
+    waiting_slot          = State()
+    waiting_phone_consent = State()
+    waiting_contact       = State()
 
 
 BOOKING_SERVICES = [
@@ -94,6 +95,16 @@ async def cb_book_service(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+def _phone_consent_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="✅ Согласен(на) передать номер телефона",
+        callback_data="book_phone_consent:accept",
+    ))
+    builder.row(InlineKeyboardButton(text="◀️ Отмена", callback_data="menu:main"))
+    return builder.as_markup()
+
+
 @router.callback_query(BookingForm.waiting_slot, F.data.startswith("book_slot:"))
 async def cb_book_slot(callback: CallbackQuery, state: FSMContext):
     slot_id = int(callback.data.split(":")[1])
@@ -106,8 +117,22 @@ async def cb_book_slot(callback: CallbackQuery, state: FSMContext):
     dt: datetime = row["slot_dt"]
     await state.update_data(slot_dt=dt.isoformat())
 
+    # 152-ФЗ: телефон — самые чувствительные данные в этом FSM, отдельное
+    # подтверждение перед тем, как бот вообще примет ввод номера.
     await callback.message.edit_text(
         f"✅ Время: <b>{dt.strftime('%d %b в %H:%M')}</b>\n\n"
+        "📞 Для подтверждения записи нужен ваш номер телефона — дизайнер "
+        "свяжется с вами по нему. Подтвердите согласие на передачу номера:",
+        parse_mode="HTML",
+        reply_markup=_phone_consent_keyboard(),
+    )
+    await state.set_state(BookingForm.waiting_phone_consent)
+    await callback.answer()
+
+
+@router.callback_query(BookingForm.waiting_phone_consent, F.data == "book_phone_consent:accept")
+async def cb_book_phone_consent(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(
         "📞 Укажите ваш <b>телефон</b> для подтверждения:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardBuilder().row(
