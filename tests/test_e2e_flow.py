@@ -42,6 +42,7 @@ def _make_user_dataclass(**kwargs):
         referred_by: Optional[int] = None
         bonus_messages: int = 0
         lang: str = "ru"
+        pdn_consent_at: Optional[datetime] = field(default_factory=datetime.now)
 
     user = _User()
     for k, v in kwargs.items():
@@ -168,6 +169,68 @@ class TestBotFlow:
         from services.database import _make_referral_code
         code = _make_referral_code(111222333)
         assert code.startswith("REF"), "Referral code must start with REF"
+
+    # ------------------------------------------------------------------ #
+    # 1b. /start — 152-ФЗ: без согласия на ПДн дальше не пускаем           #
+    # ------------------------------------------------------------------ #
+
+    @pytest.mark.asyncio
+    async def test_start_blocks_without_pdn_consent(self, new_user):
+        """A user who has never confirmed ПДн-consent must see only the
+        consent screen on /start — no welcome text, no menu hint."""
+        new_user.pdn_consent_at = None
+        message = _make_message(text="/start", user_id=555666777)
+        message.from_user.id = 555666777
+
+        with (
+            patch("handlers.start.get_or_create_user", new_callable=AsyncMock, return_value=new_user),
+            patch("handlers.start.insert_analytics_event", new_callable=AsyncMock),
+        ):
+            from handlers.start import cmd_start
+            state_mock = AsyncMock()
+            await cmd_start(message, state_mock)
+
+        # Exactly one message — the consent screen — no welcome/menu hint sent
+        assert message.answer.call_count == 1, (
+            "Without consent, /start must send only the consent screen"
+        )
+        assert message.answer_photo.call_count == 0
+
+        call = message.answer.call_args_list[0]
+        assert "reply_markup" in call.kwargs, "Consent screen must carry the confirm button"
+        text_arg = call.args[0] if call.args else call.kwargs.get("text", "")
+        assert "персональных данных" in text_arg
+
+    @pytest.mark.asyncio
+    async def test_pdn_consent_callback_unlocks_welcome(self, new_user):
+        """Confirming the ПДн-consent button records consent and immediately
+        shows the normal welcome flow."""
+        new_user.pdn_consent_at = None
+        consented_user = _make_user_dataclass(
+            telegram_id=888999000, pdn_consent_at=datetime.now()
+        )
+
+        callback = MagicMock()
+        callback.from_user = MagicMock()
+        callback.from_user.id = 888999000
+        callback.data = "pdn:consent_start"
+        callback.answer = AsyncMock()
+        callback.message = MagicMock()
+        callback.message.delete = AsyncMock()
+        callback.message.answer = AsyncMock()
+        callback.message.answer_photo = AsyncMock()
+
+        with (
+            patch("handlers.start.set_pdn_consent", new_callable=AsyncMock, return_value=consented_user),
+            patch("handlers.start.insert_analytics_event", new_callable=AsyncMock),
+        ):
+            from handlers.start import cb_pdn_consent_start
+            await cb_pdn_consent_start(callback)
+
+        callback.answer.assert_called_once()
+        callback.message.delete.assert_called_once()
+        # Welcome flow ran on the callback's message (welcome/photo + menu hint)
+        assert callback.message.answer.call_count >= 1
 
     # ------------------------------------------------------------------ #
     # 2. FAQ response — no Claude call                                     #
