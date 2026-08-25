@@ -49,7 +49,15 @@ import sentry_sdk
 load_dotenv()
 
 if os.getenv("SENTRY_DSN"):
-    sentry_sdk.init(dsn=os.getenv("SENTRY_DSN"), traces_sample_rate=0.1)
+    # 152-ФЗ: локальные переменные (phone, email, wishes...) не должны
+    # прикладываться к отчётам об ошибках на sentry.io — по умолчанию SDK
+    # это делает (include_local_variables=True). send_default_pii остаётся
+    # выключенным (default False) — IP/юзер и так не уходят.
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        traces_sample_rate=0.1,
+        include_local_variables=False,
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
