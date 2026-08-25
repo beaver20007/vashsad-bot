@@ -139,7 +139,7 @@ class TestBotFlow:
             patch("handlers.start.insert_analytics_event", new_callable=AsyncMock),
             patch("handlers.start.maybe_start_onboarding", new_callable=AsyncMock),
             patch("handlers.start.WELCOME_IMAGE_URL", ""),
-            patch("handlers.start.t", side_effect=lambda key, lang: "{bot_name} {designer_name}" if key == "welcome" else "Hint"),
+            patch("handlers.start.t", side_effect=lambda key, lang: "{bot_name} {designer_name}" if key.startswith("welcome") else "Hint"),
         ):
             from handlers.start import cmd_start
             state_mock = AsyncMock()

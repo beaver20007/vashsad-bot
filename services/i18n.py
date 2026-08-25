@@ -5,9 +5,20 @@ Basic internationalization support for the ВашСад bot.
 
 STRINGS: dict[str, dict[str, str]] = {
     "ru": {
-        "welcome": (
+        "welcome_a": (
             "🌿 <b>Добро пожаловать в {bot_name}!</b>\n\n"
             "Я — AI-помощник по Ландшафтному Дизайну Вашего Сада!\n\n"
+            "Помогу вам:\n"
+            "🗺 Создать план вашего участка\n"
+            "🌱 Подобрать растения под ваш климат и стиль\n"
+            "📸 Определить болезнь растения по фото\n"
+            "📅 Составить календарь ухода за садом\n"
+            "💬 Ответить на любой вопрос по садоводству\n\n"
+            "<b>Выберите, с чего начнём 👇</b>"
+        ),
+        "welcome_b": (
+            "🌿 <b>Добро пожаловать в {bot_name}!</b>\n\n"
+            "Я — AI-помощник {designer_name}, дипломированного ландшафтного дизайнера.\n\n"
             "Помогу вам:\n"
             "🗺 Создать план вашего участка\n"
             "🌱 Подобрать растения под ваш климат и стиль\n"
@@ -32,7 +43,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "error_generic": "❌ Что-то пошло не так. Попробуйте ещё раз или напишите в поддержку.",
     },
     "en": {
-        "welcome": (
+        "welcome_a": (
+            "🌿 <b>Welcome to {bot_name}!</b>\n\n"
+            "I am the AI assistant of {designer_name}, a certified landscape designer.\n\n"
+            "I can help you:\n"
+            "🗺 Create a plan for your plot\n"
+            "🌱 Select plants suited to your climate and style\n"
+            "📸 Identify plant diseases from photos\n"
+            "📅 Build a garden care calendar\n"
+            "💬 Answer any gardening question\n\n"
+            "<b>Choose where to start 👇</b>"
+        ),
+        "welcome_b": (
             "🌿 <b>Welcome to {bot_name}!</b>\n\n"
             "I am the AI assistant of {designer_name}, a certified landscape designer.\n\n"
             "I can help you:\n"
