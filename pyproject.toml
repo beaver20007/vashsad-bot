@@ -1,0 +1,9 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["max-integration"]
+
+[tool.ruff.lint]
+# Базовый набор: pycodestyle errors/warnings, pyflakes, isort, pyupgrade,
+# bugbear, simplify. Ничего не автофикшено — только измеряем объём находок.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
