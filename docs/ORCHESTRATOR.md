@@ -1454,3 +1454,56 @@
   telegram_id, `welcome_a`/`welcome_b` из `services/i18n.py`, метка
   `ab_variant` в аналитике теперь соответствует отправленному тексту)
   в проде с 25.08 07:43 UTC.
+
+### 2026-08-26 — read-only аудит 152-ФЗ (бот) + закрытие пункта 2 и Sentry-риска
+- Read-only аудит по 10 пунктам из брифа владельца (тот же список, что для
+  vashsad-miniapp). Отчёт сохранён:
+  `docs/audit/152fz-audit-bot-20260825.md`. Без правок кода на этом шаге.
+  Ключевые находки: политики нет, согласия на ПДн нет нигде (включая /start
+  и booking.py), бот пишет `bookings.phone` напрямую отдельно от миниаппа,
+  механизма удаления ПДн по запросу нет, Sentry по умолчанию прикладывает
+  локальные переменные к трейсбекам.
+- Владелец поставил три трека на закрытие пункта 2 + независимый фикс
+  Sentry. Уточнил у владельца ссылку на `/privacy` — страницы ещё нет ни в
+  проде, ни в ветках miniapp (проверено: `git branch -a` в
+  vashsad-miniapp — только `fix/t-order-consent-checkbox`, никакой
+  privacy-ветки). Решение владельца: текст согласия без гиперссылки сейчас,
+  ссылка — отдельным треком, когда страница появится.
+- **Трек bot-consent-start** (`fix/t-bot-consent-start`, PR #19,
+  коммит `8490d62`): новая колонка `users.pdn_consent_at TIMESTAMP`
+  (миграция по существующему паттерну `ALTER TABLE ... ADD COLUMN IF NOT
+  EXISTS`, проверено — аналога поля не было). `/start` показывает экран
+  согласия + inline-кнопку, если `pdn_consent_at IS NULL`; welcome-flow
+  вынесен в `_send_welcome()`, переиспользуется и колбэком подтверждения
+  (`cb_pdn_consent_start` → `set_pdn_consent()`). Новый
+  `handlers/consent.py::PdnConsentMiddleware` зарегистрирован в `bot.py`
+  глобально на message/callback — блокирует ЛЮБОЙ хендлер (не только
+  /start) для несогласившегося пользователя, кроме самой команды /start и
+  кнопки подтверждения. Живая проверка: новый пользователь → ровно 1
+  сообщение (текст согласия + кнопка), 0 welcome/menu-hint. Тесты: 2 новых
+  (`test_start_blocks_without_pdn_consent`,
+  `test_pdn_consent_callback_unlocks_welcome`), полный прогон `6 failed, 44
+  passed, 11 skipped` — та же база сбоев, без регрессий.
+- **Трек bot-consent-booking** (`fix/t-bot-consent-booking`, PR #20,
+  коммит `9d2d3dc`): новое состояние FSM `BookingForm.waiting_phone_consent`
+  между выбором слота и вводом телефона — отдельная кнопка «Согласен(на)
+  передать номер телефона» (`book_phone_consent:accept`). `process_contact`
+  остался зарегистрирован только на `waiting_contact` — проверено НЕ
+  предположением, а прямым вызовом реального `aiogram.filters.StateFilter`:
+  `StateFilter(waiting_contact)` → `False` для `raw_state=
+  "BookingForm:waiting_phone_consent"`, `True` только для
+  `"BookingForm:waiting_contact"`. Живая проверка: выбор слота → состояние
+  `waiting_phone_consent`, экран с кнопкой согласия, не приглашение ввести
+  номер. Тесты: 2 новых, полный прогон `6 failed, 44 passed, 11 skipped` —
+  без регрессий.
+- **Трек sentry-scrub-locals** (`fix/t-sentry-scrub-locals`, PR #21,
+  коммит `2c9962b`): `bot.py` — `sentry_sdk.init(..., traces_sample_rate=0.1,
+  include_local_variables=False)` (SDK 2.63.0, опция подтверждена по
+  `inspect.signature(ClientConstructor.__init__)`). Живая проверка:
+  `client.options["include_local_variables"] is False` после init.
+  `send_default_pii` не трогали — остаётся на дефолте (False). Полный
+  прогон `6 failed, 42 passed, 11 skipped` (конфиг-чендж без новых тестов)
+  — без регрессий.
+- Все три PR открыты, CI (`pytest (informational)`) → `pass` на всех трёх
+  (`gh pr checks 19/20/21`). Мерж и деплой — только по отдельному явному
+  слову владельца (ещё не получено на момент этой записи).

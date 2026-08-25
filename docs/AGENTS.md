@@ -6,7 +6,11 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | PR |
+|---|---|---|---|
+| bot-consent-start | `fix/t-bot-consent-start` | `C:/Projects/_worktrees/vashsad-consent-start` | #19 |
+| bot-consent-booking | `fix/t-bot-consent-booking` | `C:/Projects/_worktrees/vashsad-consent-booking` | #20 |
+| sentry-scrub-locals | `fix/t-sentry-scrub-locals` | `C:/Projects/_worktrees/vashsad-sentry-scrub` | #21 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
