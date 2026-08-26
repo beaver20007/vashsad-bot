@@ -28,3 +28,19 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — известные преюдиционные сбои, см. PR 15 и 16"
+
+  # Informational, как и test выше: конфиг (pyproject.toml) только что
+  # заведён треком chore/t-ruff-setup (2026-08-26), накопленный долг
+  # (~350 находок на момент заведения, без автофикса) не блокирует PR.
+  # Тот же приём non-blocking — шаг сам возвращает 0 через `|| echo`.
+  lint:
+    name: ruff (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check . || echo "⚠️ ruff нашёл замечания (см. лог выше) — не блокирует PR, см. docs/ORCHESTRATOR.md для объёма и плана"
