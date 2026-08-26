@@ -6,14 +6,13 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | PR |
-|---|---|---|---|
-| remove-docker-hub-deploy-job | `chore/t-remove-docker-hub-deploy-job` | `C:/Projects/_worktrees/vashsad-remove-deploy-job` | #23 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| remove-docker-hub-deploy-job | `chore/t-remove-docker-hub-deploy-job` | #23, `c2c2d54` | 2026-08-26 |
 | ruff-setup | `chore/t-ruff-setup` | #22, `04fa35b` | 2026-08-26 |
 | sentry-scrub-locals | `fix/t-sentry-scrub-locals` | #21, `2d6f1cd` | 2026-08-25 |
 | bot-consent-booking | `fix/t-bot-consent-booking` | #20, `02bddd1` | 2026-08-25 |
