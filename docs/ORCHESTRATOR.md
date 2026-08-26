@@ -1647,3 +1647,33 @@
 - Мерж/деплой по всем трекам — только по отдельному явному слову владельца
   (ещё не получено). PR #22 (ruff) можно мержить независимо. Треки 2/3/4/5
   без веток/PR — уже завершены как read-only, решения по ним за владельцем.
+
+### 2026-08-26 — PR #22 мерж/деплой, новый трек remove-docker-hub-deploy-job
+- Владелец подтвердил мерж PR #22 (ruff) + деплой на прод.
+  `gh pr merge 22 --merge --delete-branch` → `state: MERGED`, merge commit
+  `04fa35b`. Локальный `main`: fast-forward `d6b5a4b..04fa35b`. Worktree и
+  ветка убраны. **Живой деплой**: `railway status` → `vashsad-bot`
+  `Online`, новый `deployment ID` `bad75496...`. Попутно заметил:
+  `overflowing-integrity` (admin_bot), вчера зафиксированный как
+  `Crashed` из-за битого `ADMIN_BOT_TOKEN`, теперь `Online` — не трогал
+  переменную сам, похоже владелец поправил её отдельно; не расследовал
+  дальше, вне рамок этого трека. `railway logs --lines 15`: чистый
+  рестарт `vashsad-bot`, `Start polling`, без ошибок.
+- Владелец поставил новый трек по факту разведки Track 2 (позавчерашний
+  бэклог): убрать мёртвый `deploy`-job из `deploy.yml`.
+- **Трек remove-docker-hub-deploy-job**
+  (`chore/t-remove-docker-hub-deploy-job`, PR #23, коммит `aadd6dc`):
+  убрал job `deploy` целиком (Docker Hub login/build/push, SSH на VPS) и
+  устаревший header-комментарий про требуемые секреты. `test`-job не
+  трогал (тело команды то же самое). Переименовал workflow `Deploy
+  VashSad Bot` → `Post-merge tests` — старое имя вводило в заблуждение,
+  раз он больше ничего не деплоит (тот же принцип «постоянный красный
+  статус приучает игнорировать сигнал», который был обоснованием самого
+  трека). Так как `deploy.yml` триггерится только на `push: main` (не на
+  PR), полноценный CI-прогон с проверкой «0 упоминаний Docker Hub»
+  случится автоматически сразу после мержа — до мержа проверил то, что
+  можно: `yaml.safe_load` — валиден, `jobs: ['test']` (только один job
+  остался); `python -m pytest tests/ --tb=short -q` (та же команда, что и
+  в job) → `6 failed, 46 passed, 11 skipped`, без регрессий. PR #23 открыт,
+  `ruff (informational)` → `pass`, `pytest (informational)` — pending на
+  момент записи. Мерж — по отдельному явному слову владельца, как обычно.
