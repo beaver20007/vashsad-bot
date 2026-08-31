@@ -6,7 +6,9 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | PR |
+|---|---|---|---|
+| welcome-b-informal-text | `fix/t-welcome-b-informal-text` | `C:/Projects/_worktrees/vashsad-welcome-b-informal` | #24 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
