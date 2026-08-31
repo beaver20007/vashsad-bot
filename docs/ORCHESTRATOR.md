@@ -1794,3 +1794,22 @@
   прогон: `6 failed, 46 passed, 11 skipped` — без регрессий.
 - PR #24 открыт, CI на момент записи ещё не завершился. Мерж/деплой —
   по отдельному явному слову владельца, как обычно.
+
+### 2026-08-31 — PR #24 мерж и деплой на прод
+- Владелец подтвердил мерж + деплой. CI (`pytest (informational)`,
+  `ruff (informational)`) на PR #24 → оба `pass`. `gh pr view 24` →
+  `CLEAN`/`MERGEABLE`, `gh pr diff 24 --name-only` — ровно 1 файл
+  (`services/i18n.py`). `gh pr merge 24 --merge --delete-branch` →
+  `state: MERGED`, merge commit `fe92022`. Локальный `main`: fast-forward
+  `d9008a3..fe92022`. Worktree и ветка убраны.
+- **Живой деплой**: `railway status` → `vashsad-bot` `Online`, новый
+  `deployment ID` `ce2cd2f1...`; `overflowing-integrity` тоже `Online`
+  (инцидент с токенами по-прежнему закрыт). `railway logs --lines 20`:
+  чистый рестарт, `Start polling`, `Run polling for bot @washsad_ai_bot
+  id=8681716628` — без ошибок.
+- **Живая проверка содержимого**: локальный `main` на том же коммите
+  `fe92022`, что и деплой — `_welcome_text_for(100, "ru")` → вариант A,
+  текст не изменился; `_welcome_text_for(101, "ru")` → вариант B, новый
+  неформальный текст «Привет! 🌿 Я помогу подобрать сад твоей мечты...».
+- **Итог**: новый вариант B A/B-теста приветствия реально в проде с
+  31.08 07:49 UTC.
