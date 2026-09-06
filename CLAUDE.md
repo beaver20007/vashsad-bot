@@ -25,7 +25,7 @@ vashsad-full/
 │   ├── photo.py                  # Фото-диагностика (Claude Vision)
 │   ├── price.py                  # Прайс-лист, подписка
 │   ├── order.py                  # Заказ услуг, бриф проекта (FSM)
-│   ├── admin.py                  # Команды администратора
+│   ├── admin_bot_handlers.py     # Команды администратора (второй бот, не handlers/admin.py — тот убран)
 │   ├── booking.py                # Запись на консультацию (FSM)
 │   ├── export.py                 # Экспорт данных пользователя
 │   ├── feedback.py               # Отзывы и оценки
@@ -115,7 +115,7 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 - Опросы пользователей (handlers/poll.py)
 - Мониторинг ошибок (Sentry)
 - Кеширование (Redis / Upstash)
-- CI/CD: GitHub Actions → Docker Hub → VPS
+- CI/CD: реальный деплой — Railway (auto-deploy на push в `main`, отдельно от GitHub Actions)
 - pre-deploy check (scripts/pre_deploy_check.py)
 
 ## Current Sprint
@@ -136,10 +136,10 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 - [x] Опросы пользователей (handlers/poll.py)
 - [x] Мониторинг ошибок (Sentry, env: SENTRY_DSN)
 - [x] Кеширование (Redis/Upstash, env: UPSTASH_REDIS_REST_URL)
-- [x] CI/CD: GitHub Actions → Docker Hub → VPS (auto-deploy on push to main)
+- [x] CI/CD: Railway auto-deploy on push to main (Docker Hub/VPS pipeline retired — PR #23, 2026-08-26, никогда не работала: 0 секретов за всю историю)
 - [x] pre-deploy check (scripts/pre_deploy_check.py)
 - [x] DESIGNER_NAME_GEN для welcome-текста в родительном падеже
-- [x] Задеплоить на VPS
+- [x] Задеплоить на Railway
 
 ## Miniapp API Routes
 Все роуты в `vashsad-miniapp/app/api/`:
@@ -176,10 +176,17 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 | `/api/weather` | Погода |
 
 ## Deployment
-- Запуск: `docker compose up -d`
-- Перед деплоем: `python scripts/pre_deploy_check.py`
-- GitHub Actions автоматически деплоит при пуше в `main`
-- Требуемые secrets в репо: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `VPS_HOST`, `VPS_USER`, `VPS_KEY`
+- **Реальный деплой — Railway** (проект `vashsad`, сервисы `vashsad-bot` и
+  `overflowing-integrity`/admin_bot), auto-deploy на push в `main` через
+  собственную GitHub-интеграцию Railway — независимо от GitHub Actions.
+- Перед деплоем (не обязательно, справочно): `python scripts/pre_deploy_check.py`
+- `.github/workflows/deploy.yml` (переименован в «Post-merge tests»,
+  2026-08-26, PR #23) — только non-blocking pytest на push в `main`,
+  деплой не делает. Старый job `deploy` (Docker Hub + SSH на VPS) убран:
+  ни разу не работал (0 секретов `DOCKER_USERNAME`/`DOCKER_PASSWORD`/
+  `VPS_*` за всю историю репо).
+- `docker compose up -d` / `Dockerfile` — исторический путь, не текущий
+  способ деплоя.
 
 ## AI Model
 Используем: `claude-sonnet-4-20250514`
