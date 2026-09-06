@@ -1,9 +1,9 @@
 """Хендлер PDF-гайда — /guide"""
-import io
 import logging
+
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import BufferedInputFile, Message
 
 from services.pdf_generator import generate_guide_pdf
 

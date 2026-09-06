@@ -1,10 +1,10 @@
 """Ежемесячный опрос: растение сезона."""
 import logging
 import os
-from aiogram import Router, F
+
+from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message, PollAnswer
-from services.scheduler import _scheduler_instance
 
 router = Router()
 log = logging.getLogger(__name__)

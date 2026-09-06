@@ -1,13 +1,13 @@
 """Хендлер прайс-листа и оплаты YooKassa"""
 import logging
 import os
-from aiogram import Router, F, Bot
-from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, LabeledPrice
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import SERVICES, SUBSCRIPTION_PRICE, YOOKASSA_SHOP_ID
-from keyboards import price_keyboard, back_to_menu_keyboard
+from aiogram import Bot, F, Router
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, LabeledPrice, Message
+
+from config import SUBSCRIPTION_PRICE
+from keyboards import back_to_menu_keyboard, price_keyboard
 
 log = logging.getLogger(__name__)
 

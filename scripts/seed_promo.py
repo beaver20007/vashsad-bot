@@ -1,8 +1,9 @@
 import asyncio
-import asyncpg
 import os
+from datetime import datetime
+
+import asyncpg
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
 
 PROMO_CODES = [
     ('ВЕСНА2026', 15, 'Весенняя скидка 15% на все услуги', '2026-09-01'),

@@ -1,8 +1,9 @@
 """Хендлер заказа — редирект в Mini App (F1.2/F3.2)"""
 import logging
-from aiogram import Router, F
+
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, WebAppInfo
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import MINI_APP_URL

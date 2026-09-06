@@ -1,7 +1,9 @@
 """AI-сервис ВашСад Бот — обёртка над Anthropic API"""
-import aiohttp
 import logging
-from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_MAX_TOKENS
+
+import aiohttp
+
+from config import ANTHROPIC_API_KEY, ANTHROPIC_MAX_TOKENS, ANTHROPIC_MODEL
 
 log = logging.getLogger(__name__)
 

@@ -1,9 +1,8 @@
 """Хендлер реферальной программы — /referral"""
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
 
 from config import BOT_USERNAME
 from services.database import get_or_create_referral_code, get_referral_stats

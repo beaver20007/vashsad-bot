@@ -1,7 +1,8 @@
 import asyncio
-import aiohttp
 import time
-from statistics import mean, median, stdev
+from statistics import mean, median
+
+import aiohttp
 
 BASE_URL = 'http://localhost:3000'  # or from env
 

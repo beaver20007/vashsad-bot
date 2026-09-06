@@ -8,13 +8,11 @@ Uses pytest + pytest-asyncio + unittest.mock.
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import pytest_asyncio
 
 # ---------------------------------------------------------------------------
 # Helpers / stubs
@@ -446,7 +444,7 @@ class TestBookingPhoneConsent:
         state.set_state = AsyncMock()
 
         with patch("handlers.booking.get_pool", new_callable=AsyncMock, return_value=pool):
-            from handlers.booking import cb_book_slot, BookingForm
+            from handlers.booking import BookingForm, cb_book_slot
             await cb_book_slot(callback, state)
 
         state.set_state.assert_called_once_with(BookingForm.waiting_phone_consent)
@@ -472,7 +470,7 @@ class TestBookingPhoneConsent:
         state = AsyncMock()
         state.set_state = AsyncMock()
 
-        from handlers.booking import cb_book_phone_consent, BookingForm
+        from handlers.booking import BookingForm, cb_book_phone_consent
         await cb_book_phone_consent(callback, state)
 
         state.set_state.assert_called_once_with(BookingForm.waiting_contact)

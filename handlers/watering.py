@@ -1,12 +1,12 @@
 """Напоминания о поливе растений."""
 import logging
-import os
-from datetime import datetime, time as dtime
-from aiogram import Router, F
+from datetime import datetime
+
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 router = Router()
 log = logging.getLogger(__name__)
