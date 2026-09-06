@@ -64,7 +64,7 @@ async def cmd_start(message: Message):
         await add_admin(uid, name, "owner")
         await message.answer(
             "🌿 <b>Админ-бот ВашСад</b>\n\n"
-            f"Вы первый, кто сюда написал — назначены <b>owner</b>.\n"
+            "Вы первый, кто сюда написал — назначены <b>owner</b>.\n"
             "Добавляйте остальных: <code>/add_admin ID Имя role</code> "
             "(role: owner/team).",
             parse_mode="HTML",

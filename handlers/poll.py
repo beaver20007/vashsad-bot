@@ -38,7 +38,7 @@ async def send_monthly_poll(bot):
         try:
             msg = await bot.send_poll(
                 row['telegram_id'],
-                question=f"🌿 Какое растение стало вашим открытием этого месяца?",
+                question="🌿 Какое растение стало вашим открытием этого месяца?",
                 options=options,
                 is_anonymous=False,
                 allows_multiple_answers=False,

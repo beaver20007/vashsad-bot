@@ -56,8 +56,8 @@ async def _start_plants_flow(message: Message, state: FSMContext, edit: bool = F
 
     if not can_use_plants(user, FREE_PLANTS_LIMIT):
         text = (
-            f"⚠️ Лимит бесплатных запросов подбора исчерпан.\n\n"
-            f"Оформите подписку <b>«Сад Про»</b> за безлимитный подбор!"
+            "⚠️ Лимит бесплатных запросов подбора исчерпан.\n\n"
+            "Оформите подписку <b>«Сад Про»</b> за безлимитный подбор!"
         )
         kb = subscribe_keyboard()
         if edit:
