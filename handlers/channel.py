@@ -1,12 +1,12 @@
 """Хендлер проверки подписки на Telegram-канал"""
 import logging
 
-from aiogram import Router, F, Bot
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from config import CHANNEL_USERNAME
-from services.database import get_or_create_user, add_bonus_messages
+from services.database import add_bonus_messages, get_or_create_user
 
 log = logging.getLogger(__name__)
 router = Router()

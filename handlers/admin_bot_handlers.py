@@ -5,15 +5,19 @@
 """
 import logging
 
-from aiogram import Router, F, Bot
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.database import get_designer_stats, get_ab_stats, update_order_status, get_pool
 from services.admin_auth import (
-    is_admin, is_owner, admin_table_empty, add_admin, list_admins,
+    add_admin,
+    admin_table_empty,
+    is_admin,
+    is_owner,
+    list_admins,
 )
+from services.database import get_ab_stats, get_designer_stats, get_pool, update_order_status
 
 router = Router()
 log = logging.getLogger(__name__)

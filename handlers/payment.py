@@ -1,8 +1,8 @@
 """Хендлер Telegram Payments (YooKassa invoice)"""
 import logging
+
 from aiogram import Router
-from aiogram.types import PreCheckoutQuery, Message
-from aiogram.filters import Command
+from aiogram.types import Message, PreCheckoutQuery
 
 from services.database import activate_subscription
 

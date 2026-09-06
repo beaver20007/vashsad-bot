@@ -4,8 +4,8 @@ Run: pytest tests/test_handlers.py -v
 
 Tests pure/synchronous functions only — no DB or Telegram connection needed.
 """
-import sys
 import os
+import sys
 
 import pytest
 
@@ -24,7 +24,7 @@ class TestCheckFaq:
     def _import(self):
         # Import lazily so that missing aiogram doesn't break collection
         try:
-            from handlers.chat import check_faq, FAQ_PATTERNS
+            from handlers.chat import FAQ_PATTERNS, check_faq
             self.check_faq = check_faq
             self.FAQ_PATTERNS = FAQ_PATTERNS
         except ImportError as exc:
@@ -116,8 +116,8 @@ class TestWelcomeAbVariant:
         assert 0.45 <= share_a <= 0.55, f"Variant A share {share_a:.3f} is skewed"
 
     def test_welcome_text_matches_assigned_variant(self):
-        from services.i18n import t
         import config
+        from services.i18n import t
 
         even_id, odd_id = 918273644, 918273645
         assert self._variant_for(even_id) == "A"
@@ -252,7 +252,7 @@ class TestOrderHelpers:
     @pytest.fixture(autouse=True)
     def _import(self):
         try:
-            from handlers.order import normalize_phone, is_foreign_email
+            from handlers.order import is_foreign_email, normalize_phone
             self.normalize_phone = normalize_phone
             self.is_foreign_email = is_foreign_email
         except ImportError as exc:

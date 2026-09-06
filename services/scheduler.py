@@ -3,9 +3,10 @@ services/scheduler.py
 Сезонные рассылки через APScheduler.
 """
 import logging
+
 import aiohttp
 from aiogram import Bot
-from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -146,7 +147,7 @@ async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: "datetime"
 async def schedule_nps(bot: Bot, telegram_id: int, order_id: int) -> None:
     """Планирует NPS-опрос через 3 дня после выполнения заявки."""
     from datetime import datetime, timedelta
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 
     # Используем глобальный шедулер из setup_scheduler
     run_at = datetime.now() + timedelta(days=3)
@@ -169,8 +170,9 @@ async def _send_nps_job(bot: Bot, telegram_id: int, order_id: int) -> None:
 async def schedule_watering_reminder(bot, telegram_id: int, plants: str, time_str: str, frequency: str):
     if not _scheduler_instance:
         return
-    from apscheduler.triggers.cron import CronTrigger
     from datetime import datetime
+
+    from apscheduler.triggers.cron import CronTrigger
 
     t = datetime.strptime(time_str, "%H:%M")
     job_id = f"watering_{telegram_id}_{time_str}"

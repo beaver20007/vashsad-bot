@@ -1,9 +1,9 @@
 """Фаза 5: NPS-опрос после выполнения заявки"""
 import logging
-from aiogram import Router, F, Bot
+
+from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
 
 from config import DESIGNER_TELEGRAM_ID
 from services.database import get_pool

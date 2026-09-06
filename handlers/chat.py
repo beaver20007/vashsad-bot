@@ -1,13 +1,18 @@
 """Хендлер AI-чата по садоводству"""
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
 from config import FREE_CHAT_LIMIT, SUBSCRIPTION_PRICE
 from keyboards import back_to_menu_keyboard, subscribe_keyboard
-from services.database import get_or_create_user, can_use_chat, add_message_to_history, update_user, add_bonus_messages
-from services.ai import ask_claude, SYSTEM_PROMPT
+from services.ai import SYSTEM_PROMPT, ask_claude
+from services.database import (
+    add_bonus_messages,
+    add_message_to_history,
+    can_use_chat,
+    get_or_create_user,
+    update_user,
+)
 
 router = Router()
 

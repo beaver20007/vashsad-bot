@@ -1,19 +1,19 @@
 """Хендлер генерации плана участка — пошаговый FSM"""
 import logging
 import os
-from aiogram import Router, F
+
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
 
-from keyboards import back_to_menu_keyboard, cancel_keyboard, plan_result_keyboard
-from services.ai import ask_claude
-from services.pdf_generator import generate_plan_pdf
-from services.database import get_or_create_user, save_order
 from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID
+from keyboards import cancel_keyboard, plan_result_keyboard
+from services.ai import ask_claude
+from services.database import get_or_create_user, save_order
+from services.pdf_generator import generate_plan_pdf
 
 router = Router()
 log = logging.getLogger(__name__)

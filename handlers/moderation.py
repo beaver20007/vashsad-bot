@@ -7,9 +7,10 @@
 бана к реальным пользователям), не дублирующая admin-команда.
 """
 import logging
+from typing import Any, Awaitable, Callable
+
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
-from typing import Any, Awaitable, Callable
 
 from services.database import get_pool
 
