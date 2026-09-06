@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
@@ -27,22 +27,22 @@ def _make_user_dataclass(**kwargs):
     @dataclass
     class _User:
         telegram_id: int = 123456789
-        username: Optional[str] = "testuser"
-        first_name: Optional[str] = "Test"
-        region: Optional[str] = None
+        username: str | None = "testuser"
+        first_name: str | None = "Test"
+        region: str | None = None
         is_subscribed: bool = False
         chat_count: int = 0
         photo_count: int = 0
         plants_count: int = 0
-        plot_size: Optional[float] = None
+        plot_size: float | None = None
         chat_history: list = field(default_factory=list)
         created_at: datetime = field(default_factory=datetime.now)
-        subscription_expires_at: Optional[datetime] = None
-        referral_code: Optional[str] = None
-        referred_by: Optional[int] = None
+        subscription_expires_at: datetime | None = None
+        referral_code: str | None = None
+        referred_by: int | None = None
         bonus_messages: int = 0
         lang: str = "ru"
-        pdn_consent_at: Optional[datetime] = field(default_factory=datetime.now)
+        pdn_consent_at: datetime | None = field(default_factory=datetime.now)
 
     user = _User()
     for k, v in kwargs.items():
@@ -56,7 +56,7 @@ def _make_message(
     username: str = "testuser",
     first_name: str = "Test",
     language_code: str = "ru",
-    date: Optional[datetime] = None,
+    date: datetime | None = None,
 ) -> MagicMock:
     """Build a minimal aiogram Message mock."""
     msg = MagicMock()

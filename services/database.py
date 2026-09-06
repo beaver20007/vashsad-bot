@@ -8,7 +8,6 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 import asyncpg
 
@@ -244,22 +243,22 @@ async def _create_tables() -> None:
 @dataclass
 class User:
     telegram_id: int
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    region: Optional[str] = None
+    username: str | None = None
+    first_name: str | None = None
+    region: str | None = None
     is_subscribed: bool = False
     chat_count: int = 0
     photo_count: int = 0
     plants_count: int = 0
-    garden_area: Optional[float] = None
+    garden_area: float | None = None
     chat_history: list = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
-    subscription_expires_at: Optional[datetime] = None
-    referral_code: Optional[str] = None
-    referred_by: Optional[int] = None
+    subscription_expires_at: datetime | None = None
+    referral_code: str | None = None
+    referred_by: int | None = None
     bonus_messages: int = 0
     lang: str = "ru"
-    pdn_consent_at: Optional[datetime] = None
+    pdn_consent_at: datetime | None = None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -329,7 +328,7 @@ async def get_or_create_user(
     )
 
 
-def get_user(telegram_id: int) -> Optional[User]:
+def get_user(telegram_id: int) -> User | None:
     """Синхронная обёртка для совместимости — лучше использовать async версию."""
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(get_or_create_user(telegram_id))
@@ -689,7 +688,7 @@ async def save_payment(
     return row["id"]
 
 
-async def get_payment_by_yookassa_id(yookassa_id: str) -> Optional[dict]:
+async def get_payment_by_yookassa_id(yookassa_id: str) -> dict | None:
     async with _pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT * FROM payments WHERE yookassa_id=$1", yookassa_id
@@ -697,7 +696,7 @@ async def get_payment_by_yookassa_id(yookassa_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
-async def mark_payment_succeeded(yookassa_id: str) -> Optional[int]:
+async def mark_payment_succeeded(yookassa_id: str) -> int | None:
     """Отметить платёж как успешный. Возвращает telegram_id."""
     async with _pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -874,7 +873,7 @@ async def insert_analytics_event(
         )
 
 
-async def update_order_status(order_id: int, status: str) -> Optional[dict]:
+async def update_order_status(order_id: int, status: str) -> dict | None:
     """Обновить статус заявки. Возвращает dict с telegram_id, service_name, service_type или None."""
     async with _pool.acquire() as conn:
         row = await conn.fetchrow(

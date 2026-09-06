@@ -1,6 +1,6 @@
 """Хендлер /start — приветствие, главное меню + кнопка Mini App"""
 import os
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
@@ -97,7 +97,7 @@ async def _send_welcome(target, telegram_id: int, user) -> None:
     variant = _pick_ab_variant(telegram_id)
 
     # Определяем нового ли пользователя (created_at в пределах 30 сек от now)
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     is_new_user = False
     if user.created_at:
         created = user.created_at

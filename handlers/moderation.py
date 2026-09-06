@@ -9,7 +9,8 @@
 import logging
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
-from typing import Any, Awaitable, Callable
+from typing import Any
+from collections.abc import Awaitable, Callable
 
 from services.database import get_pool
 

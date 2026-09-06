@@ -5,7 +5,8 @@ services/notifications.py
 import asyncio
 import logging
 import os
-from typing import Callable, Coroutine, Any
+from typing import Any
+from collections.abc import Callable, Coroutine
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest, TelegramRetryAfter

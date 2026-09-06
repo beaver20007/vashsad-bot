@@ -4,15 +4,14 @@
 """
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass
 class User:
     telegram_id: int
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    region: Optional[str] = None
+    username: str | None = None
+    first_name: str | None = None
+    region: str | None = None
     is_subscribed: bool = False
     chat_count: int = 0        # AI-сообщений за месяц
     photo_count: int = 0       # Фото-диагностик за месяц
@@ -25,7 +24,7 @@ class User:
 _users: dict[int, User] = {}
 
 
-def get_user(telegram_id: int) -> Optional[User]:
+def get_user(telegram_id: int) -> User | None:
     return _users.get(telegram_id)
 
 
