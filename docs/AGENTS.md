@@ -6,7 +6,11 @@
 
 ## Активные треки
 
-Пусто — все треки ниже смёржены.
+| Трек | Ветка | Worktree | PR |
+|---|---|---|---|
+| ruff-wave1-import-hygiene | `chore/t-ruff-wave1-import-hygiene` | `C:/Projects/_worktrees/vashsad-ruff-wave1-imports` | #25 |
+| ruff-wave2-py312-syntax | `chore/t-ruff-wave2-py312-syntax` | `C:/Projects/_worktrees/vashsad-ruff-wave2-syntax` | #26 |
+| ruff-wave3-fstring-cleanup | `chore/t-ruff-wave3-fstring-cleanup` | `C:/Projects/_worktrees/vashsad-ruff-wave3-fstrings` | #27 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
