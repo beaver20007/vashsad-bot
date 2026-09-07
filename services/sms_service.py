@@ -1,7 +1,8 @@
 """SMS уведомления через smsc.ru — ВашСад Бот"""
-import aiohttp
 import logging
 import os
+
+import aiohttp
 
 log = logging.getLogger(__name__)
 

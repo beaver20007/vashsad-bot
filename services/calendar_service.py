@@ -1,5 +1,5 @@
 """Генерация ICS-файлов и ссылок Google Calendar для записей на консультацию."""
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 

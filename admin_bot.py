@@ -10,15 +10,15 @@ import asyncio
 import logging
 import os
 import ssl
-from dotenv import load_dotenv
 
+import aiohttp
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
-import aiohttp
+from dotenv import load_dotenv
 
 from handlers.admin_bot_handlers import router as admin_bot_router
-from services.database import init_db, close_db
 from services.admin_auth import create_admin_users_table, ensure_order_reply_column
+from services.database import close_db, init_db
 
 load_dotenv()
 

@@ -1,11 +1,11 @@
 """Фаза 1: Onboarding-квиз для новых пользователей"""
 import logging
-from aiogram import Router, F
+
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
 
 from services.database import get_or_create_user, update_user_region
 

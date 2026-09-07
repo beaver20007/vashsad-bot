@@ -2,10 +2,10 @@
 import logging
 import secrets
 import string
-from aiogram import Router, F, Bot
+
+from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import Message
 
 from config import DESIGNER_TELEGRAM_ID
 from services.database import get_pool

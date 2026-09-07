@@ -4,11 +4,15 @@ import io
 import logging
 import os
 from datetime import datetime, timedelta
-from aiogram import Router, F
+
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import (
-    Message, BufferedInputFile, InlineKeyboardButton,
-    InlineKeyboardMarkup, CallbackQuery,
+    BufferedInputFile,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -186,8 +190,8 @@ async def cmd_export_clients(message: Message):
                ORDER BY o.telegram_id, o.created_at DESC"""
         )
 
-    from services.pdf_generator import generate_clients_pdf
     from config import DESIGNER_NAME
+    from services.pdf_generator import generate_clients_pdf
 
     clients_data = [dict(r) for r in rows]
     pdf_bytes = generate_clients_pdf(clients_data, designer_name=DESIGNER_NAME)
@@ -201,11 +205,11 @@ async def cmd_export_clients(message: Message):
 
 
 def _build_favorites_pdf(rows) -> bytes:
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -267,14 +271,12 @@ def _build_favorites_pdf(rows) -> bytes:
 
 
 def _build_pdf(rows, period_label: str) -> bytes:
-    from reportlab.lib.pagesizes import A4
+
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    import os
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,

@@ -8,8 +8,13 @@ import uuid
 
 from yookassa import Configuration, Payment
 
-from config import YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY, YOOKASSA_RETURN_URL
-from services.database import save_payment, get_payment_by_yookassa_id, mark_payment_succeeded, activate_subscription
+from config import YOOKASSA_RETURN_URL, YOOKASSA_SECRET_KEY, YOOKASSA_SHOP_ID
+from services.database import (
+    activate_subscription,
+    get_payment_by_yookassa_id,
+    mark_payment_succeeded,
+    save_payment,
+)
 
 log = logging.getLogger(__name__)
 

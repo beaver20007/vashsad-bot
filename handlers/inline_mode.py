@@ -1,10 +1,13 @@
 """Фаза 4: Inline-режим — @vashsad_bot [вопрос] в любом чате"""
 import logging
+
 from aiogram import Router
 from aiogram.types import (
-    InlineQuery, InlineQueryResultArticle,
+    InlineQuery,
+    InlineQueryResultArticle,
     InputTextMessageContent,
 )
+
 from services.ai import ask_claude
 
 router = Router()
