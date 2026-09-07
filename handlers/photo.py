@@ -66,8 +66,8 @@ async def cb_photo(callback: CallbackQuery):
     user = await get_or_create_user(callback.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
         await callback.message.edit_text(
-            f"⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
-            f"Оформите подписку <b>«Сад Про»</b>!",
+            "⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
+            "Оформите подписку <b>«Сад Про»</b>!",
             parse_mode="HTML",
             reply_markup=subscribe_keyboard(),
         )
