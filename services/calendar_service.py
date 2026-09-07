@@ -1,5 +1,5 @@
 """Генерация ICS-файлов и ссылок Google Calendar для записей на консультацию."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 
@@ -26,9 +26,9 @@ def generate_ics(
     """
     # Нормализуем к UTC
     if start_dt.tzinfo is None:
-        start_utc = start_dt.replace(tzinfo=timezone.utc)
+        start_utc = start_dt.replace(tzinfo=UTC)
     else:
-        start_utc = start_dt.astimezone(timezone.utc)
+        start_utc = start_dt.astimezone(UTC)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 
@@ -80,9 +80,9 @@ def build_google_calendar_url(
         URL для Google Calendar.
     """
     if start_dt.tzinfo is None:
-        start_utc = start_dt.replace(tzinfo=timezone.utc)
+        start_utc = start_dt.replace(tzinfo=UTC)
     else:
-        start_utc = start_dt.astimezone(timezone.utc)
+        start_utc = start_dt.astimezone(UTC)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 

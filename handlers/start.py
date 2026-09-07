@@ -1,21 +1,31 @@
 """Хендлер /start — приветствие, главное меню + кнопка Mini App"""
 import os
-from datetime import datetime, timezone
-from aiogram import Router, F
-from aiogram.filters import CommandStart, Command
+from datetime import UTC, datetime
+
+from aiogram import F, Router
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    Message, CallbackQuery,
-    InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo,
-    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import (
-    BOT_NAME, DESIGNER_NAME, DESIGNER_NAME_GEN, MINI_APP_URL, WELCOME_IMAGE_URL,
-    FREE_CHAT_LIMIT, FREE_PHOTO_LIMIT, FREE_PLANTS_LIMIT,
+    BOT_NAME,
+    DESIGNER_NAME_GEN,
+    FREE_CHAT_LIMIT,
+    FREE_PHOTO_LIMIT,
+    FREE_PLANTS_LIMIT,
+    MINI_APP_URL,
+    WELCOME_IMAGE_URL,
 )
-from keyboards import main_menu_keyboard, back_to_menu_keyboard
 from services.database import get_or_create_user, insert_analytics_event, set_pdn_consent
 from services.i18n import t
 
@@ -97,7 +107,7 @@ async def _send_welcome(target, telegram_id: int, user) -> None:
     variant = _pick_ab_variant(telegram_id)
 
     # Определяем нового ли пользователя (created_at в пределах 30 сек от now)
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     is_new_user = False
     if user.created_at:
         created = user.created_at
@@ -427,7 +437,6 @@ async def process_callback_phone(message: Message, state: FSMContext):
     await state.clear()
 
     # Notify designer
-    import os
     import aiohttp
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     designer_id = os.getenv("DESIGNER_TELEGRAM_ID")

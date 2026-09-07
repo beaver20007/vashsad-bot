@@ -6,6 +6,7 @@ Checks all required env vars, DB connectivity, and configuration.
 import asyncio
 import os
 import sys
+
 from dotenv import load_dotenv
 
 load_dotenv()

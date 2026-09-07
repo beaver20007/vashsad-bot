@@ -6,46 +6,44 @@ import asyncio
 import logging
 import os
 import ssl
-from dotenv import load_dotenv
 
+import aiohttp
+import redis.asyncio as aioredis
+import sentry_sdk
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.redis import RedisStorage
-import aiohttp
-import redis.asyncio as aioredis
+from dotenv import load_dotenv
 
-from handlers.start import router as start_router
-from handlers.plan import router as plan_router
-from handlers.plants import router as plants_router
-from handlers.order import router as order_router
-from handlers.photo import router as photo_router
-from handlers.price import router as price_router
-from handlers.guide import router as guide_router
-from handlers.referral import router as referral_router
-from handlers.payment import router as payment_router
-from handlers.onboarding import router as onboarding_router
-from handlers.feedback import router as feedback_router
 from handlers.booking import router as booking_router
-from handlers.promo import router as promo_router
+from handlers.channel import router as channel_router
+from handlers.chat import router as chat_router  # ← chat ПОСЛЕДНИМ
+from handlers.consent import PdnConsentMiddleware
+from handlers.export import router as export_router
+from handlers.feedback import router as feedback_router
+from handlers.guide import router as guide_router
 from handlers.inline_mode import router as inline_router
 from handlers.moderation import BanCheckMiddleware
-from handlers.consent import PdnConsentMiddleware
-from handlers.rate_limit import RateLimitMiddleware
-from handlers.export import router as export_router
-from handlers.payment_stars import router as payment_stars_router
-from handlers.poll import router as poll_router
-from handlers.watering import router as watering_router
 from handlers.nurseries import router as nurseries_router
-from handlers.season_plan import router as season_plan_router
+from handlers.onboarding import router as onboarding_router
+from handlers.order import router as order_router
+from handlers.payment import router as payment_router
+from handlers.payment_stars import router as payment_stars_router
+from handlers.photo import router as photo_router
+from handlers.plan import router as plan_router
+from handlers.plants import router as plants_router
+from handlers.poll import router as poll_router
+from handlers.price import router as price_router
+from handlers.promo import router as promo_router
+from handlers.rate_limit import RateLimitMiddleware
+from handlers.referral import router as referral_router
 from handlers.saved_replies import router as saved_replies_router
-from handlers.channel import router as channel_router
-from handlers.chat import router as chat_router   # ← chat ПОСЛЕДНИМ
-
-from services.database import init_db, close_db
+from handlers.season_plan import router as season_plan_router
+from handlers.start import router as start_router
+from handlers.watering import router as watering_router
+from services.database import close_db, init_db
 from services.scheduler import setup_scheduler
 from services.webhook_server import start_webhook_server
-
-import sentry_sdk
 
 load_dotenv()
 

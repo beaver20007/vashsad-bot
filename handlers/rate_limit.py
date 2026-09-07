@@ -1,7 +1,9 @@
+import time
+from collections import defaultdict
+
 from aiogram import BaseMiddleware
 from aiogram.types import Message
-from collections import defaultdict
-import time
+
 
 class RateLimitMiddleware(BaseMiddleware):
     def __init__(self, limit=20, window=60):

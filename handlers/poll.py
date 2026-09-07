@@ -1,10 +1,10 @@
 """Ежемесячный опрос: растение сезона."""
 import logging
 import os
-from aiogram import Router, F
+
+from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message, PollAnswer
-from services.scheduler import _scheduler_instance
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ async def send_monthly_poll(bot):
         try:
             msg = await bot.send_poll(
                 row['telegram_id'],
-                question=f"🌿 Какое растение стало вашим открытием этого месяца?",
+                question="🌿 Какое растение стало вашим открытием этого месяца?",
                 options=options,
                 is_anonymous=False,
                 allows_multiple_answers=False,

@@ -6,8 +6,9 @@
 import asyncio
 import os
 import sys
-from dotenv import load_dotenv
+
 import aiohttp
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -166,7 +167,7 @@ async def main() -> None:
             print("  setBotProfilePhoto: SKIP — BOT_PHOTO_URL не задан в .env")
 
     bot_username = os.getenv("BOT_USERNAME", "vashsad_bot")
-    print(f"\n✅ BotFather настроен!")
+    print("\n✅ BotFather настроен!")
     print(f"🤖 Бот: https://t.me/{bot_username}")
 
 

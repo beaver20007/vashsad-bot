@@ -8,12 +8,12 @@ from datetime import date
 
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import BufferedInputFile, Message
 
+from config import DESIGNER_NAME
 from services.ai import ask_claude
 from services.database import get_or_create_user, get_pool
 from services.pdf_generator import generate_plan_pdf
-from config import DESIGNER_NAME
 
 log = logging.getLogger(__name__)
 

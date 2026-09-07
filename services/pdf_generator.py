@@ -3,14 +3,13 @@ services/pdf_generator.py
 Генерация PDF-гайда «15 растений для природного сада НО» через ReportLab.
 """
 import io
+
+from reportlab.lib.colors import HexColor, white
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.colors import HexColor, white, black
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-)
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config import DESIGNER_NAME
 

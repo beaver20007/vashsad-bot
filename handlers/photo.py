@@ -1,12 +1,18 @@
 """Хендлер фото-диагностики — с сохранением в PostgreSQL"""
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, PhotoSize
+from aiogram.types import CallbackQuery, Message, PhotoSize
 
 from config import FREE_PHOTO_LIMIT
-from keyboards import back_to_menu_keyboard, subscribe_keyboard, cancel_keyboard
-from services.database import get_or_create_user, can_use_photo, update_user, save_diagnosis, get_user_diagnoses
+from keyboards import back_to_menu_keyboard, cancel_keyboard, subscribe_keyboard
 from services.ai import ask_claude_with_image
+from services.database import (
+    can_use_photo,
+    get_or_create_user,
+    get_user_diagnoses,
+    save_diagnosis,
+    update_user,
+)
 
 router = Router()
 
@@ -60,8 +66,8 @@ async def cb_photo(callback: CallbackQuery):
     user = await get_or_create_user(callback.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
         await callback.message.edit_text(
-            f"⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
-            f"Оформите подписку <b>«Сад Про»</b>!",
+            "⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
+            "Оформите подписку <b>«Сад Про»</b>!",
             parse_mode="HTML",
             reply_markup=subscribe_keyboard(),
         )

@@ -1,16 +1,17 @@
 """Фаза 1: Запись на консультацию — FSM с выбором слота"""
 import logging
 from datetime import datetime, timedelta
-from aiogram import Router, F, Bot
+
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_TELEGRAM_ID, DESIGNER_NAME
+from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID
+from services.calendar_service import build_google_calendar_url, generate_ics
 from services.database import get_pool
-from services.calendar_service import generate_ics, build_google_calendar_url
 
 router = Router()
 log = logging.getLogger(__name__)

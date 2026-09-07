@@ -1,17 +1,19 @@
 """Хендлер подбора растений"""
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
 
 from config import FREE_PLANTS_LIMIT
 from keyboards import (
-    plants_region_keyboard, plants_type_keyboard,
-    back_to_menu_keyboard, subscribe_keyboard, cancel_keyboard, plan_result_keyboard
+    plan_result_keyboard,
+    plants_region_keyboard,
+    plants_type_keyboard,
+    subscribe_keyboard,
 )
-from services.database import get_or_create_user, can_use_plants, update_user
 from services.ai import select_plants
+from services.database import can_use_plants, get_or_create_user, update_user
 
 router = Router()
 
@@ -56,8 +58,8 @@ async def _start_plants_flow(message: Message, state: FSMContext, edit: bool = F
 
     if not can_use_plants(user, FREE_PLANTS_LIMIT):
         text = (
-            f"⚠️ Лимит бесплатных запросов подбора исчерпан.\n\n"
-            f"Оформите подписку <b>«Сад Про»</b> за безлимитный подбор!"
+            "⚠️ Лимит бесплатных запросов подбора исчерпан.\n\n"
+            "Оформите подписку <b>«Сад Про»</b> за безлимитный подбор!"
         )
         kb = subscribe_keyboard()
         if edit:
@@ -92,8 +94,8 @@ async def cb_plant_type(callback: CallbackQuery, state: FSMContext):
     await state.update_data(plant_type=PLANT_TYPE_NAMES.get(plant_type, plant_type))
     await state.set_state(PlantsForm.waiting_light)
 
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.types import InlineKeyboardButton
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="☀️ Солнце (6+ ч)", callback_data="light:sun"),

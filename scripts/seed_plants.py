@@ -921,7 +921,7 @@ ON CONFLICT (name, latin_name) DO NOTHING
 
 
 async def main() -> None:
-    print(f"Connecting to database...")
+    print("Connecting to database...")
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         print("Ensuring plants table exists...")
@@ -953,7 +953,7 @@ async def main() -> None:
             else:
                 skipped += 1
 
-        print(f"\nDone!")
+        print("\nDone!")
         print(f"  Plants inserted : {inserted}")
         print(f"  Plants skipped  : {skipped} (already existed)")
         print(f"  Total in batch  : {len(PLANTS)}")
