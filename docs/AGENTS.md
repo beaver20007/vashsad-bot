@@ -6,16 +6,16 @@
 
 ## Активные треки
 
-| Трек | Ветка | Worktree | PR |
-|---|---|---|---|
-| ruff-wave1-import-hygiene | `chore/t-ruff-wave1-import-hygiene` | `C:/Projects/_worktrees/vashsad-ruff-wave1-imports` | #25 |
-| ruff-wave2-py312-syntax | `chore/t-ruff-wave2-py312-syntax` | `C:/Projects/_worktrees/vashsad-ruff-wave2-syntax` | #26 |
-| ruff-wave3-fstring-cleanup | `chore/t-ruff-wave3-fstring-cleanup` | `C:/Projects/_worktrees/vashsad-ruff-wave3-fstrings` | #27 |
+Пусто — все треки ниже смёржены.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| ruff-line-length-120 | `chore/t-ruff-line-length-120` | #28, `bd0c27b` | 2026-09-07 |
+| ruff-wave3-fstring-cleanup | `chore/t-ruff-wave3-fstring-cleanup` | #27, `2d3f9bb` | 2026-09-07 |
+| ruff-wave2-py312-syntax | `chore/t-ruff-wave2-py312-syntax` | #26, `7990212` | 2026-09-07 |
+| ruff-wave1-import-hygiene | `chore/t-ruff-wave1-import-hygiene` | #25, `00b65e5` | 2026-09-07 |
 | welcome-b-informal-text | `fix/t-welcome-b-informal-text` | #24, `fe92022` | 2026-08-31 |
 | remove-docker-hub-deploy-job | `chore/t-remove-docker-hub-deploy-job` | #23, `c2c2d54` | 2026-08-26 |
 | ruff-setup | `chore/t-ruff-setup` | #22, `04fa35b` | 2026-08-26 |
