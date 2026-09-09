@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID
+from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2
 from services.calendar_service import build_google_calendar_url, generate_ics
 from services.database import get_pool
 
@@ -230,11 +230,13 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     except Exception as e:
         log.warning("Ошибка планирования напоминаний: %s", e)
 
-    if DESIGNER_TELEGRAM_ID:
+    user = message.from_user
+    for designer_id in [DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2]:
+        if not designer_id:
+            continue
         try:
-            user = message.from_user
             await bot.send_message(
-                DESIGNER_TELEGRAM_ID,
+                designer_id,
                 f"📅 <b>Новая запись!</b>\n\n"
                 f"👤 {user.first_name} (@{user.username or '—'})\n"
                 f"🛎 {svc_name} — {svc_price:,} ₽\n"
@@ -243,7 +245,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
                 parse_mode="HTML",
             )
         except Exception as e:
-            log.warning("Уведомление дизайнеру: %s", e)
+            log.warning("Уведомление дизайнеру %s: %s", designer_id, e)
 
     await state.clear()
 
