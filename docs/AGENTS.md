@@ -9,6 +9,7 @@
 | Трек | Ветка | PR | Статус |
 |---|---|---|---|
 | remove-dead-code-and-hardcodes | `chore/t-remove-dead-code-and-hardcodes` | #29 | открыт, не смёржен — ждёт владельца |
+| portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30 | открыт, не смёржен — ждёт владельца |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
