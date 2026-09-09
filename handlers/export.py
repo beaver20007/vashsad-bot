@@ -17,6 +17,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_TELEGRAM_ID
+from services.content_texts import DEFAULT_QUALIFICATION_LINE, get_designer_qualification_line
 from services.database import get_pool
 
 router = Router()
@@ -100,7 +101,7 @@ async def cmd_favorites_pdf(message: Message):
         await message.answer("У вас пока нет сохранённых растений. Добавьте их через раздел «Подбор растений».")
         return
 
-    pdf_bytes = _build_favorites_pdf(rows)
+    pdf_bytes = _build_favorites_pdf(rows, qualification_line=await get_designer_qualification_line())
     filename = f"ВашСад_растения_{datetime.now().strftime('%d%m%Y')}.pdf"
 
     await message.answer_document(
@@ -204,7 +205,7 @@ async def cmd_export_clients(message: Message):
     )
 
 
-def _build_favorites_pdf(rows) -> bytes:
+def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_LINE) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -262,7 +263,7 @@ def _build_favorites_pdf(rows) -> bytes:
 
     elems.append(Spacer(1, 0.5*cm))
     elems.append(Paragraph(
-        "ВашСад · Дипломированный ландшафтный дизайнер · Нижегородская и Владимирская области · @vashsad_bot",
+        f"ВашСад · {qualification_line} · Нижегородская и Владимирская области · @vashsad_bot",
         footer_style,
     ))
 

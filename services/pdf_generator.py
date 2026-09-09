@@ -12,6 +12,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config import DESIGNER_NAME
+from services.content_texts import DEFAULT_QUALIFICATION_LINE
 
 # ── Цветовая палитра ──
 SAGE   = HexColor("#4A6B50")
@@ -45,6 +46,7 @@ def generate_plan_pdf(
     area: str,
     style: str,
     designer_name: str = DESIGNER_NAME,
+    qualification_line: str = DEFAULT_QUALIFICATION_LINE,
 ) -> bytes:
     """Генерирует PDF план участка и возвращает байты."""
     from datetime import date
@@ -105,7 +107,7 @@ def generate_plan_pdf(
     story.append(HRFlowable(width="100%", thickness=0.5, color=EARTH))
     story.append(Spacer(1, 0.3*cm))
     story.append(Paragraph(
-        "Дипломированный ландшафтный дизайнер · Природный стиль садов · "
+        f"{qualification_line} · Природный стиль садов · "
         "Нижегородская и Владимирская области",
         footer_style,
     ))
@@ -148,7 +150,10 @@ def generate_plan_pdf(
     return buffer.getvalue()
 
 
-def generate_guide_pdf(designer_name: str = DESIGNER_NAME) -> bytes:
+def generate_guide_pdf(
+    designer_name: str = DESIGNER_NAME,
+    qualification_line: str = DEFAULT_QUALIFICATION_LINE,
+) -> bytes:
     """Генерирует PDF-гайд и возвращает байты."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -206,7 +211,7 @@ def generate_guide_pdf(designer_name: str = DESIGNER_NAME) -> bytes:
     story.append(Spacer(1, 0.5*cm))
     story.append(HRFlowable(width="100%", thickness=1.5, color=SAGE))
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph(f"Составил: {designer_name} · Дипломированный ландшафтный дизайнер", author_style))
+    story.append(Paragraph(f"Составил: {designer_name} · {qualification_line}", author_style))
     story.append(HRFlowable(width="100%", thickness=0.5, color=EARTH))
     story.append(Spacer(1, 0.8*cm))
 

@@ -5,6 +5,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import BufferedInputFile, Message
 
+from services.content_texts import get_designer_qualification_line
 from services.pdf_generator import generate_guide_pdf
 
 router = Router()
@@ -19,7 +20,7 @@ async def cmd_guide(message: Message):
         parse_mode="HTML",
     )
     try:
-        pdf_bytes = generate_guide_pdf()
+        pdf_bytes = generate_guide_pdf(qualification_line=await get_designer_qualification_line())
         document = BufferedInputFile(pdf_bytes, filename="ВашСад_15_растений.pdf")
         await message.answer_document(
             document=document,
