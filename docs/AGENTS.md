@@ -11,6 +11,7 @@
 | remove-dead-code-and-hardcodes | `chore/t-remove-dead-code-and-hardcodes` | #29 | открыт, не смёржен — ждёт владельца |
 | portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30 | открыт, не смёржен — ждёт владельца |
 | design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена (дизайн) |
+| content-texts-reads | `feat/t-content-texts-reads` | #32 | открыт, не смёржен — код неактивен до наката #31 |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
