@@ -51,11 +51,13 @@ COMMANDS = [
 # /save_reply, /replies, /r, /delete_reply
 
 # NB: одноразовый офлайн-скрипт (запускается вручную, не часть работающего
-# бота) — не подключён к content_texts (services/content_texts.py, трек
+# бота) — не подключён к content_strings (services/content_texts.py, трек
 # feat/t-content-texts-reads). Текст ниже правьте здесь руками синхронно с
-# content_texts.designer.qualification_line, если/когда его поменяют там.
+# content_strings.designer_bio.default, если его поменяют там.
+# "Дипломированного" убрано решением владельца (09.09.2026) — та же
+# правка, что и в services/content_texts.py::DEFAULT_QUALIFICATION_LINE.
 DESCRIPTION = (
-    "🌿 Бот дипломированного ландшафтного дизайнера. "
+    "🌿 Бот ландшафтного дизайнера. "
     "Природный стиль садов для Нижегородской и Владимирской областей.\n\n"
     "• AI-консультации по растениям и участку\n"
     "• Фото-диагностика болезней и вредителей\n"
