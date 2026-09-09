@@ -12,6 +12,7 @@
 | portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30 | открыт, не смёржен — ждёт владельца |
 | design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена (дизайн) |
 | content-texts-reads | `feat/t-content-texts-reads` | #32 | открыт, не смёржен — код неактивен до наката #31 |
+| fix-claude-md-redis-var | `docs/t-fix-claude-md-redis-var` | #33 | открыт, не смёржен — ждёт владельца |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
