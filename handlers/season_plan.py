@@ -12,6 +12,7 @@ from aiogram.types import BufferedInputFile, Message
 
 from config import DESIGNER_NAME
 from services.ai import ask_claude
+from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, get_pool
 from services.pdf_generator import generate_plan_pdf
 
@@ -131,6 +132,7 @@ async def cmd_season_plan(message: Message) -> None:
             area="весь участок",
             style=f"Природный сад · {region}",
             designer_name=DESIGNER_NAME,
+            qualification_line=await get_designer_qualification_line(),
         )
 
         today = date.today().strftime("%Y-%m-%d")

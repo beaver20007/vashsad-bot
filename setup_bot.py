@@ -50,6 +50,10 @@ COMMANDS = [
 # /send_poll, /poll_results, /ab_stats, /ban, /unban,
 # /save_reply, /replies, /r, /delete_reply
 
+# NB: одноразовый офлайн-скрипт (запускается вручную, не часть работающего
+# бота) — не подключён к content_texts (services/content_texts.py, трек
+# feat/t-content-texts-reads). Текст ниже правьте здесь руками синхронно с
+# content_texts.designer.qualification_line, если/когда его поменяют там.
 DESCRIPTION = (
     "🌿 Бот дипломированного ландшафтного дизайнера. "
     "Природный стиль садов для Нижегородской и Владимирской областей.\n\n"

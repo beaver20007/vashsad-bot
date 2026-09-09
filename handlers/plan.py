@@ -12,6 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID
 from keyboards import cancel_keyboard, plan_result_keyboard
 from services.ai import ask_claude
+from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, save_order
 from services.pdf_generator import generate_plan_pdf
 
@@ -274,6 +275,7 @@ async def plan_generate(callback: CallbackQuery, state: FSMContext):
             area=data.get("area", "—"),
             style=data.get("style", "—"),
             designer_name=DESIGNER_NAME,
+            qualification_line=await get_designer_qualification_line(),
         )
         await callback.message.answer_document(
             BufferedInputFile(pdf_bytes, filename="план_сада.pdf"),
