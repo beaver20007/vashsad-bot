@@ -2084,3 +2084,52 @@ BotFather/вебхуки/токены не трогались, ничего не
 #31 после ревью Ани формулировки designer.qualification_line → #32
 сразу после #31 (или раньше — код неактивен без миграции, но проще
 мержить в этом порядке).
+
+## 2026-09-10 — Сведение схемы content_texts/content_strings с parallel-треком miniapp (PR#31/#32)
+
+Владелец обнаружил, что miniapp параллельно спроектировала ту же
+таблицу под тем же ночным брифингом (PR beaver20007/vashsad-miniapp#120,
+`db/migrations/020_content_strings_up.sql`) — под другим именем и
+другой формой. Задача: одно имя, одна схема, до какого-либо наката;
+плюс внести решённые владельцем значения содержимого.
+
+- **Прочитан PR#120 через `gh pr diff --repo beaver20007/vashsad-miniapp`**
+  (read-only, без прав на запись в чужой репозиторий). Схема там:
+  `content_strings(namespace VARCHAR(64), key VARCHAR(64), value JSONB,
+  updated_at TIMESTAMP, PRIMARY KEY(namespace, key))`.
+- **PR #31 переписан** (коммит `67de00d`): `content_texts` (flat
+  key+TEXT) → `content_strings` (namespace+key составной PK + JSONB) —
+  буквальная копия схемы miniapp. `updated_by` отброшен (в схеме
+  miniapp его нет). Файлы переименованы
+  `content_texts_*.sql` → `content_strings_*.sql`.
+- **designer_bio.default засеян окончательными значениями владельца**:
+  `education = "Garden Group, ТГУ — программы переподготовки «Ландшафтный
+  дизайнер»"`, `status = "Беру первые проекты"` — идентично черновику
+  miniapp, который владелец в этом же решении утвердил как финальный
+  (решение по item 3 брифа 09.09.2026-10, не требует согласования с
+  Аней — владелец сам определил формулировку).
+- **order_status.* сознательно НЕ засеян и назван явным расхождением**,
+  не решён единолично: тексты бота (`ORDER_STATUS_INFO` в
+  `admin_bot_handlers.py`) и черновик miniapp расходятся по формулировке
+  для одних и тех же `(namespace, key)` пар, обе миграции — без `ON
+  CONFLICT DO NOTHING`. Требует отдельного решения владельца по каждому
+  статусу, вне рамок сегодняшних item 1-3 (те касались только
+  service_price/budget_range/designer_bio).
+- **PR #32 обновлён** (коммит `dc41d38`): `get_text(key, default)` →
+  `get_value(namespace, key)`, парсит JSONB (asyncpg отдаёт его текстом
+  без кодека — тот же паттерн, что уже в
+  `services/database.py::insert_analytics_event`).
+  `get_designer_qualification_line()` теперь берёт
+  `designer_bio.default.education`. `DEFAULT_QUALIFICATION_LINE` в коде
+  обновлён на финальную формулировку — **становится живым текстом сразу
+  после мержа PR**, накат миграции для этого не требуется (fallback = 
+  уже верный текст). `setup_bot.py`'s `DESCRIPTION` (профиль бота в
+  BotFather) поправлен тем же решением вручную (скрипт не подключён к
+  БД).
+- Оба PR прокомментированы (`gh pr comment`) с описанием изменений,
+  ссылкой на miniapp#120 и явным напоминанием: НЕ применено, НЕ
+  смёржено — ждёт слова владельца вместе с parallel-стороной miniapp.
+- item 1 (service_price без скидки) и item 2 (budget_range отброшен) —
+  относятся к parallel-треку #119 в miniapp, не к этому репозиторию;
+  здесь не тронуто, зафиксировано как контекст, не как задача этой
+  сессии.
