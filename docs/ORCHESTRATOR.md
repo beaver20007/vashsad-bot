@@ -2161,3 +2161,68 @@ BotFather/вебхуки/токены не трогались, ничего не
   без потери прогресса).
 - Всё по-прежнему НЕ применено, НЕ смёржено — ждёт общего слова со всей
   серией (включая parallel-сторону miniapp).
+
+## 2026-09-10 — Мерж PR#29/#30/#33 (владелец разрешил, независимы от контент-слоя)
+
+Владелец разрешил смержить три трека независимых от серии #31/#32
+(content_strings) — те остаются на паузе. Порядок: #33 → #29 → #30
+(последним, т.к. пересекается с #29 по файлам).
+
+- **PR #33** (`docs/t-fix-claude-md-redis-var`) → `gh pr merge --merge
+  --delete-branch` → merge commit `ad6926d`. CI (`pytest`/`ruff`
+  informational) — оба `pass` до мержа. Без пересечений по файлам ни с
+  чем — чисто.
+- **PR #29** (`chore/t-remove-dead-code-and-hardcodes`) → CI `pass`/
+  `pass` → `gh pr merge --merge --delete-branch` → merge commit
+  `7772b49`. merge-base с main на момент мержа не сдвигался
+  (`0a2c29d`) — новые коммиты main после ветвления были только
+  докс-файлы, конфликтов не было.
+- **PR #30 (`fix/t-portfolio-designer2-notify-gate`) — конфликт, как
+  и ожидалось** (пересекается с #29 по `config.py`,
+  `handlers/admin_bot_handlers.py`, `handlers/plan.py`). Резолвил в
+  worktree `vashsad-track3-real-bugs`: `git fetch` + `git merge
+  origin/main` → 2 файла с конфликт-маркерами
+  (`handlers/plan.py` — только строка импорта, `config.py` смёржился
+  автоматически без маркеров).
+  - `handlers/plan.py`: объединил импорт —
+    `DESIGNER_TELEGRAM_ID_2` (эта ветка) + `MINI_APP_URL` (пришло с
+    #29's редиректом на каталог стилей).
+  - `handlers/admin_bot_handlers.py`: два конфликта в `cb_set_status` и
+    `cmd_update_order`. Собрал итог из ОБЕИХ сторон: источник текста —
+    `ORDER_STATUS_INFO` от #29 (включает уже утверждённый владельцем
+    текст `done`), логика гейта `notify_order_status` — от #30, включая
+    трёхветочное сообщение админу ("уведомлён" / "клиент отключил" /
+    "нет текста для статуса"). Не взял ни одну сторону вслепую.
+  - Проверка после резолва: `python -m py_compile` на всех 4 изменённых
+    файлах — 0 ошибок; `pytest tests/` → `6 failed, 41 passed,
+    11 skipped` (база минус 5 тестов SERVICES, удалённых #29 — совпадает
+    с ожиданием); `ruff check` — те же 5 старых E501, ничего нового на
+    резолвленных строках.
+  - Смёржил origin/main в ветку коммитом `d37b538`, запушил, дождался
+    CI (`pytest`/`ruff` → `pass`/`pass`), проверил
+    `git merge-base --is-ancestor origin/main
+    origin/fix/t-portfolio-designer2-notify-gate` → `true` → `gh pr
+    merge 30 --merge --delete-branch` → merge commit `e0c26df`.
+- **Синхронизация локального main**: `git fetch` + `git merge
+  origin/main --ff-only` в главном рабочем дереве — fast-forward
+  `3818c65..e0c26df`, без конфликтов.
+- **Финальная проверка фактом на синхронизированном main**: `pytest
+  tests/` → `6 failed, 41 passed, 11 skipped` — та же база, что и в
+  worktree, без регрессий от объединения трёх PR разом.
+- Локальные worktree и ветки треков #29/#30/#33 удалены
+  (`git worktree remove --force` + `git branch -d`). Worktree #31/#32
+  (`vashsad-track4-content-migration`, `vashsad-track5-content-reads`)
+  оставлены как есть — на паузе.
+- ⚠️ Технический инцидент по пути: Bash-инструмент этой сессии на
+  какое-то время переставал резолвить `gh`/`cat`/`grep`/`which`
+  (пустой `PATH` внутри `/usr/bin/bash`, тот же класс проблемы, что
+  описан в CLAUDE.md про Git-for-Windows Unix-подсистему) — переключилась
+  на PowerShell для `gh`-команд, на инструмент `Grep`/`Read` вместо
+  `grep`/`cat`. Позже Bash сам восстановился (использован для финальных
+  `git`-команд без проблем). Прогресс не потерян, повторных попыток
+  тех же команд без диагностики не делала.
+- **Итог**: main теперь на `e0c26df` — мёртвый код убран, `/portfolio`
+  404 исправлен, паритет второго дизайнера восстановлен,
+  `notify_order_status` соблюдается. PR #31/#32 остаются открытыми,
+  не смёржены, ждут решения по остальным `order_status.*` и общего
+  слова с miniapp.

@@ -6,24 +6,26 @@
 
 ## Активные треки
 
-Ночь 2026-09-09 (бот→miniapp-thin-layer, 7 треков брифа) — все PR
-подготовлены, worktree ниже. Ничего не смёржено, миграция (#31) не
-применена — ждут владельца. Полная сводка: docs/ORCHESTRATOR.md,
-запись «2026-09-09».
+Ночь 2026-09-09 (бот→miniapp-thin-layer, 7 треков брифа). 10.09.2026
+владелец разрешил мерж #29/#30/#33 (независимы от контент-слоя) — все
+три смёржены, см. архив ниже. #31/#32 (content_strings) остаются на
+паузе — ждут общего слова вместе с parallel-стороной miniapp
+(PR beaver20007/vashsad-miniapp#120). Полная сводка: docs/ORCHESTRATOR.md,
+записи «2026-09-09» и «2026-09-10».
 
 | Трек | Ветка | PR | Статус |
 |---|---|---|---|
-| remove-dead-code-and-hardcodes | `chore/t-remove-dead-code-and-hardcodes` | #29 | открыт, не смёржен — ждёт владельца |
-| portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30 | открыт, не смёржен — ждёт владельца |
-| design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена (дизайн) |
+| design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена; схема сверена с miniapp#120, order_status.done решён, остальные статусы TODO |
 | content-texts-reads | `feat/t-content-texts-reads` | #32 | открыт, не смёржен — код неактивен до наката #31 |
-| fix-claude-md-redis-var | `docs/t-fix-claude-md-redis-var` | #33 | открыт, не смёржен — ждёт владельца |
 | (рекомендация, не трек) | vashsad-miniapp/bot/ — удалить | — | не PR, текст владельцу — чужой репозиторий |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30, `e0c26df` | 2026-09-10 |
+| remove-dead-code-and-hardcodes | `chore/t-remove-dead-code-and-hardcodes` | #29, `7772b49` | 2026-09-10 |
+| fix-claude-md-redis-var | `docs/t-fix-claude-md-redis-var` | #33, `ad6926d` | 2026-09-10 |
 | ruff-line-length-120 | `chore/t-ruff-line-length-120` | #28, `bd0c27b` | 2026-09-07 |
 | ruff-wave3-fstring-cleanup | `chore/t-ruff-wave3-fstring-cleanup` | #27, `2d3f9bb` | 2026-09-07 |
 | ruff-wave2-py312-syntax | `chore/t-ruff-wave2-py312-syntax` | #26, `7990212` | 2026-09-07 |
