@@ -348,13 +348,22 @@ async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
             "UPDATE orders SET status=$1 WHERE id=$2 RETURNING telegram_id, service_name",
             new_status, order_id,
         )
+        if row:
+            notify_row = await conn.fetchrow(
+                "SELECT notify_order_status FROM users WHERE telegram_id=$1", row["telegram_id"],
+            )
 
     if not row:
         await callback.answer("Ошибка обновления", show_alert=True)
         return
 
+    # users.notify_order_status (миграция 012 в vashsad-miniapp, общая БД) —
+    # тот же флаг, что уже соблюдает miniapp в orders/[id]/status/route.ts.
+    # NULL/отсутствие строки = разрешено (дефолт TRUE).
+    notify_allowed = notify_row is None or notify_row["notify_order_status"] is not False
+
     label = ORDER_STATUSES.get(new_status, new_status)
-    msg_text = ORDER_STATUS_INFO.get(new_status, {}).get("client_text")
+    msg_text = ORDER_STATUS_INFO.get(new_status, {}).get("client_text") if notify_allowed else None
     if msg_text:
         try:
             # main_bot, не bot: клиент переписывается с основным ботом
@@ -486,7 +495,15 @@ async def cmd_update_order(message: Message, main_bot: Bot):
     service_label = row.get("service_name") or row.get("service_type") or "Заявка"
     user_msg = ORDER_STATUS_INFO.get(status, {}).get("client_text")
     notified = False
+    notify_allowed = True
     if user_msg and row["telegram_id"]:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            notify_row = await conn.fetchrow(
+                "SELECT notify_order_status FROM users WHERE telegram_id=$1", row["telegram_id"],
+            )
+        notify_allowed = notify_row is None or notify_row["notify_order_status"] is not False
+    if user_msg and row["telegram_id"] and notify_allowed:
         try:
             # main_bot: клиент переписывается с основным ботом, не с этим.
             await main_bot.send_message(
@@ -500,7 +517,12 @@ async def cmd_update_order(message: Message, main_bot: Bot):
         except Exception as e:
             log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
     label = ORDER_STATUSES.get(status, status)
-    note = "Пользователь уведомлён" if notified else "Уведомление не отправлено (нет сообщения для этого статуса)"
+    if notified:
+        note = "Пользователь уведомлён"
+    elif user_msg and not notify_allowed:
+        note = "Уведомление не отправлено (клиент отключил их в профиле)"
+    else:
+        note = "Уведомление не отправлено (нет сообщения для этого статуса)"
     await message.answer(f"✅ Заявка #{order_id} обновлена\nСтатус: {label}\n{note}")
 
 

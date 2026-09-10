@@ -1,6 +1,5 @@
 """Хендлер генерации плана участка — пошаговый FSM"""
 import logging
-import os
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -9,7 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, MINI_APP_URL
+from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
 from keyboards import cancel_keyboard, plan_result_keyboard
 from services.ai import ask_claude
 from services.database import get_or_create_user, save_order
@@ -17,8 +16,6 @@ from services.pdf_generator import generate_plan_pdf
 
 router = Router()
 log = logging.getLogger(__name__)
-
-DESIGNER_TELEGRAM_ID_2 = int(os.getenv("DESIGNER_TELEGRAM_ID_2", "0"))
 
 
 class PlanForm(StatesGroup):

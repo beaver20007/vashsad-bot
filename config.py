@@ -8,6 +8,10 @@ load_dotenv()
 # ── Telegram ────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 DESIGNER_TELEGRAM_ID = int(os.getenv("DESIGNER_TELEGRAM_ID", "0"))
+# Второй дизайнер — раньше уведомлялся только из handlers/plan.py (свой
+# локальный os.getenv). Вынесено сюда, чтобы booking.py/feedback.py/
+# services/scheduler.py могли уведомлять обоих тем же паттерном.
+DESIGNER_TELEGRAM_ID_2 = int(os.getenv("DESIGNER_TELEGRAM_ID_2", "0"))
 
 # ── Anthropic ───────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
