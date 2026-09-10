@@ -5,10 +5,10 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2
+from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
 from keyboards import cancel_keyboard, plan_result_keyboard
 from services.ai import ask_claude
 from services.database import get_or_create_user, save_order
@@ -84,23 +84,25 @@ async def _start_plan(message: Message, state: FSMContext, edit: bool = False):
 async def plan_area(message: Message, state: FSMContext):
     await state.update_data(area=message.text.strip())
 
+    # Раньше здесь были 4 захардкоженных кнопки (природный/регулярный/
+    # кантри/минимализм), не связанные с полным каталогом стилей (15 штук,
+    # styles/style_sections) — выбор просто уходил в свободный текст заявки.
+    # Теперь стиль — свободный текст здесь же, а полный каталог с описаниями
+    # смотрят в приложении (та же ссылка, что и в price.py/order.py).
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="🌿 Природный", callback_data="style:природный"),
-        InlineKeyboardButton(text="🏛 Регулярный", callback_data="style:регулярный"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="🌾 Кантри", callback_data="style:кантри"),
-        InlineKeyboardButton(text="🔲 Минимализм", callback_data="style:минимализм"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="🤷 Помогите выбрать", callback_data="style:не знаю"),
+        InlineKeyboardButton(
+            text="🎨 Посмотреть каталог стилей",
+            web_app=WebAppInfo(url=f"{MINI_APP_URL}?screen=styles"),
+        )
     )
     builder.row(InlineKeyboardButton(text="◀️ Отмена", callback_data="cancel"))
 
     await message.answer(
         _progress(2) +
-        "🎨 <b>Какой стиль сада вам нравится?</b>",
+        "🎨 <b>Какой стиль сада вам нравится?</b>\n\n"
+        "<i>Напишите название стиля текстом (например: природный, кантри, "
+        "минимализм) — или откройте каталог кнопкой ниже, если нужны примеры.</i>",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -108,9 +110,9 @@ async def plan_area(message: Message, state: FSMContext):
 
 
 # ── Шаг 2: стиль → шаг 3 (бюджет) ──────────────────────────
-@router.callback_query(F.data.startswith("style:"), PlanForm.waiting_style)
-async def plan_style(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(style=callback.data.split(":", 1)[1])
+@router.message(PlanForm.waiting_style)
+async def plan_style(message: Message, state: FSMContext):
+    await state.update_data(style=message.text.strip())
 
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="💸 до 100 000 ₽", callback_data="budget:до 100к"))
@@ -118,14 +120,13 @@ async def plan_style(callback: CallbackQuery, state: FSMContext):
     builder.row(InlineKeyboardButton(text="💎 от 300 000 ₽", callback_data="budget:300к+"))
     builder.row(InlineKeyboardButton(text="◀️ Отмена", callback_data="cancel"))
 
-    await callback.message.edit_text(
+    await message.answer(
         _progress(3) +
         "💰 <b>Какой примерный бюджет на благоустройство?</b>",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
     await state.set_state(PlanForm.waiting_budget)
-    await callback.answer()
 
 
 # ── Шаг 3: бюджет → шаг 4 (пожелания) ──────────────────────

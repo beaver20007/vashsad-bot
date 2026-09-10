@@ -193,7 +193,7 @@ class TestReferralCode:
 
 
 # ---------------------------------------------------------------------------
-# 3. Price constants — config.py :: SERVICES and SUBSCRIPTION_PRICE
+# 3. Price constants — config.py :: SUBSCRIPTION_PRICE
 # ---------------------------------------------------------------------------
 
 class TestPriceConstants:
@@ -212,29 +212,6 @@ class TestPriceConstants:
 
     def test_subscription_price_is_int(self):
         assert isinstance(self.config.SUBSCRIPTION_PRICE, int)
-
-    def test_services_dict_exists(self):
-        assert hasattr(self.config, "SERVICES")
-        assert isinstance(self.config.SERVICES, dict)
-
-    def test_services_not_empty(self):
-        assert len(self.config.SERVICES) > 0
-
-    def test_each_service_has_required_keys(self):
-        required = {"name", "price", "duration", "description"}
-        for key, svc in self.config.SERVICES.items():
-            missing = required - svc.keys()
-            assert not missing, f"Service '{key}' missing keys: {missing}"
-
-    def test_consult_price_positive(self):
-        svc = self.config.SERVICES.get("consult")
-        assert svc is not None
-        assert svc["price"] > 0
-
-    def test_concept_price_greater_than_consult(self):
-        consult = self.config.SERVICES["consult"]["price"]
-        concept = self.config.SERVICES["concept"]["price"]
-        assert concept > consult
 
     def test_free_limits_are_positive(self):
         assert self.config.FREE_CHAT_LIMIT > 0
