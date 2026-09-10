@@ -84,8 +84,7 @@ YOOKASSA_SHOP_ID=           # YooKassa магазин
 YOOKASSA_SECRET_KEY=        # YooKassa секрет
 WEBHOOK_SECRET=             # Секрет для YooKassa webhook
 SENTRY_DSN=                 # Sentry для мониторинга ошибок
-UPSTASH_REDIS_REST_URL=     # Redis (Upstash) для кеширования
-UPSTASH_REDIS_REST_TOKEN=   # Redis токен
+REDIS_URL=                  # Redis (Upstash), rediss:// — FSM storage (bot.py), см. также кеш
 ```
 
 ## Features
@@ -135,7 +134,7 @@ UPSTASH_REDIS_REST_TOKEN=   # Redis токен
 - [x] Напоминания о поливе (handlers/watering.py)
 - [x] Опросы пользователей (handlers/poll.py)
 - [x] Мониторинг ошибок (Sentry, env: SENTRY_DSN)
-- [x] Кеширование (Redis/Upstash, env: UPSTASH_REDIS_REST_URL)
+- [x] Кеширование (Redis/Upstash, env: REDIS_URL)
 - [x] CI/CD: Railway auto-deploy on push to main (Docker Hub/VPS pipeline retired — PR #23, 2026-08-26, никогда не работала: 0 секретов за всю историю)
 - [x] pre-deploy check (scripts/pre_deploy_check.py)
 - [x] DESIGNER_NAME_GEN для welcome-текста в родительном падеже
