@@ -35,51 +35,6 @@ YOOKASSA_RETURN_URL = os.getenv("YOOKASSA_RETURN_URL", "https://t.me/vashsad_bot
 # ── Бот ─────────────────────────────────────
 BOT_USERNAME = os.getenv("BOT_USERNAME", "vashsad_bot")
 
-# ── Прайс-лист ──────────────────────────────
-SERVICES = {
-    "consult": {
-        "name": "Экспресс-консультация",
-        "price": 1500,
-        "duration": "24 часа",
-        "description": "Разбор вашего участка + персональные рекомендации"
-    },
-    "plants_pro": {
-        "name": "Подбор растений Pro",
-        "price": 2500,
-        "duration": "2 дня",
-        "description": "Список 15–20 растений с фото, схемой посадки и уходом"
-    },
-    "analysis": {
-        "name": "Анализ существующего сада",
-        "price": 3900,
-        "duration": "3 дня",
-        "description": "Разбор фото вашего участка + план улучшений"
-    },
-    "seasonal": {
-        "name": "Сезонный план ухода",
-        "price": 3500,
-        "duration": "2 дня",
-        "description": "Персональный годовой календарь ухода за вашим садом в PDF"
-    },
-    "zoning": {
-        "name": "Зонирование участка",
-        "price": 4900,
-        "duration": "3 дня",
-        "description": "Схема зон, дорожек, въезда + описание каждой зоны"
-    },
-    "concept": {
-        "name": "Концепция сада",
-        "price": 9900,
-        "duration": "5 дней",
-        "description": "Стиль + мудборд + общая схема + список растений"
-    },
-    "project": {
-        "name": "Индивидуальный проект",
-        "price": 0,  # индивидуальный расчёт
-        "duration": "по договору",
-        "description": "Полный ландшафтный проект — индивидуальный расчёт"
-    },
-}
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://vashsad-miniapp-pi.vercel.app")
 WELCOME_IMAGE_URL = os.getenv("WELCOME_IMAGE_URL", "")
 
