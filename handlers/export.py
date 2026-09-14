@@ -262,7 +262,7 @@ def _build_favorites_pdf(rows) -> bytes:
 
     elems.append(Spacer(1, 0.5*cm))
     elems.append(Paragraph(
-        "ВашСад · Дипломированный ландшафтный дизайнер · Нижегородская и Владимирская области · @vashsad_bot",
+        "ВашСад · Дипломированный ландшафтный дизайнер · Нижегородская и Владимирская области · @washsad_ai_bot",
         footer_style,
     ))
 

@@ -64,7 +64,7 @@ async def handle_inline(query: InlineQuery):
         title=f"🌿 {q[:40]}",
         description=answer[:100] + ("..." if len(answer) > 100 else ""),
         input_message_content=InputTextMessageContent(
-            message_text=f"🌿 <b>{q}</b>\n\n{answer}\n\n<i>— ВашСад AI (@vashsad_bot)</i>",
+            message_text=f"🌿 <b>{q}</b>\n\n{answer}\n\n<i>— ВашСад AI (@washsad_ai_bot)</i>",
             parse_mode="HTML",
         ),
     )
