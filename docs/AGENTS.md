@@ -17,14 +17,14 @@
 |---|---|---|---|
 | design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена; схема сверена с miniapp#120, order_status.done решён, остальные статусы TODO |
 | content-texts-reads | `feat/t-content-texts-reads` | #32 | открыт, не смёржен — код неактивен до наката #31 |
-| bot-username-live-surfaces | `fix/t-bot-username-live-surfaces` | #34 | открыт, не смёржен — ждёт владельца (приоритетный, клиенто-видимый баг) |
-| bot-username-defaults | `fix/t-bot-username-defaults` | #35 | открыт, не смёржен — ждёт владельца |
 | (рекомендация, не трек) | vashsad-miniapp/bot/ — удалить | — | не PR, текст владельцу — чужой репозиторий |
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| bot-username-defaults | `fix/t-bot-username-defaults` | #35, `43cdcbf` | 2026-09-14 |
+| bot-username-live-surfaces | `fix/t-bot-username-live-surfaces` | #34, `b2a7da9` | 2026-09-14 |
 | portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30, `e0c26df` | 2026-09-10 |
 | remove-dead-code-and-hardcodes | `chore/t-remove-dead-code-and-hardcodes` | #29, `7772b49` | 2026-09-10 |
 | fix-claude-md-redis-var | `docs/t-fix-claude-md-redis-var` | #33, `ad6926d` | 2026-09-10 |

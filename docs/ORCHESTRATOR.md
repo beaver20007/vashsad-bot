@@ -2259,3 +2259,36 @@ BotFather/вебхуки/токены не трогались, ничего не
   записи.
 - Оба PR **НЕ смёржены** — ждут слова владельца, как и было
   оговорено.
+
+## 2026-09-14 (продолжение) — Мерж PR#34/#35 (владелец подтвердил приёмку)
+
+Владелец разрешил мерж, оба трека независимы друг от друга и от
+остальной серии.
+
+- CI (`pytest`/`ruff` informational) — `pass`/`pass` на обоих PR перед
+  мержем.
+- Файлы не пересекаются (`handlers/export.py`+`handlers/inline_mode.py`
+  у #34 против `config.py`+`setup_bot.py`+`.env.example` у #35) —
+  проверил через `gh pr diff --name-only` перед мержем.
+- **PR #34** → `gh pr merge --merge --delete-branch` → merge commit
+  `b2a7da9`.
+- **PR #35** → `git merge-base --is-ancestor origin/main
+  origin/fix/t-bot-username-defaults` вернул `false` (main успел уйти
+  вперёд на merge-коммит #34), но т.к. файлы не пересекаются — просто
+  смержил: `gh pr merge --merge --delete-branch` → чисто, без
+  конфликта, merge commit `43cdcbf`.
+- Синхронизация локального main: `git fetch` + `git merge origin/main
+  --ff-only` — fast-forward `108db66..43cdcbf`, 5 файлов.
+- **Финальная проверка фактом**: `pytest tests/` на синхронизированном
+  main → `6 failed, 41 passed, 11 skipped` — база не сдвинулась.
+  `grep` по `*.py` на `washsad_ai_bot|vashsad_bot` подтвердил: все 5
+  заявленных мест теперь на `washsad_ai_bot`; из старого хендла
+  остались только `YOOKASSA_RETURN_URL` (вне периметра брифа) и
+  докстринг-комментарий в `inline_mode.py:1` (не входил в список
+  брифа, не клиенто-видимый).
+- Локальные ветки треков удалены (`git branch -d`), worktree уже были
+  удалены на прошлом шаге.
+- **Итог**: main теперь на `43cdcbf` (на GitHub — оба merge-коммита
+  через `gh pr merge` ушли туда напрямую). Оба клиенто-видимых бага с
+  неверным именем бота исправлены — Railway auto-deploy на push в
+  `main` подхватит их без отдельного действия.
