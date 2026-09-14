@@ -166,7 +166,7 @@ async def main() -> None:
         else:
             print("  setBotProfilePhoto: SKIP — BOT_PHOTO_URL не задан в .env")
 
-    bot_username = os.getenv("BOT_USERNAME", "vashsad_bot")
+    bot_username = os.getenv("BOT_USERNAME", "washsad_ai_bot")
     print("\n✅ BotFather настроен!")
     print(f"🤖 Бот: https://t.me/{bot_username}")
 
