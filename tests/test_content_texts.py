@@ -72,3 +72,12 @@ def test_text_without_placeholder_returned_as_is(monkeypatch):
 def test_canceled_not_read_from_content(monkeypatch):
     _patch_row(monkeypatch, {"notify_text": "не должно использоваться"})
     assert _run(content_texts.get_order_status_text("canceled", "concept")) is None
+
+
+def test_canceled_sends_nothing(monkeypatch):
+    """Ни из БД, ни из локального запасного текста: на отмену клиенту ничего не шлётся."""
+    from handlers import admin_bot_handlers
+
+    _patch_row(monkeypatch, {"notify_text": "не должно использоваться"})
+    assert _run(admin_bot_handlers._status_client_text("canceled", "concept")) is None
+    assert "client_text" not in admin_bot_handlers.ORDER_STATUS_INFO["canceled"]

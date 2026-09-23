@@ -50,9 +50,8 @@ async def get_designer_qualification_line() -> str:
 
 # Статусы, тексты которых бот берёт из content_strings/order_status — тот же
 # набор, что NOTIFY_STATUSES в miniapp (app/api/orders/[id]/status/route.ts).
-# canceled сюда сознательно НЕ входит: miniapp по решению владельца
-# (23.09.2026) на отмену клиенту ничего не шлёт, а бот сегодня шлёт —
-# расхождение вынесено владельцу, поведение бота не менялось.
+# canceled сюда сознательно НЕ входит: по решению владельца (23.09.2026)
+# на отмену клиенту ничего не шлётся ни из miniapp, ни из бота.
 CONTENT_STATUSES = frozenset({"in_progress", "review", "done"})
 
 SERVICE_PLACEHOLDER = "{service}"

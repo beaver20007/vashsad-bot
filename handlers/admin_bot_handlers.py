@@ -46,9 +46,10 @@ ORDER_STATUS_INFO: dict[str, dict[str, str]] = {
         # поверхностях (бот + miniapp) для этого статуса.
         "client_text": "✅ Ваша заявка <b>выполнена</b>! Пожалуйста, оставьте отзыв в приложении.",
     },
+    # Без client_text: на отмену клиенту ничего не шлём (решение владельца
+    # 23.09.2026, как и в miniapp) — меняется только статус в БД.
     "canceled": {
         "label": "❌ Отменена",
-        "client_text": "❌ Ваша заявка <b>отменена</b>. Если есть вопросы — напишите нам.",
     },
 }
 
@@ -58,7 +59,9 @@ ORDER_STATUSES = {key: info["label"] for key, info in ORDER_STATUS_INFO.items()}
 
 async def _status_client_text(status: str, service_type: str | None) -> str | None:
     """Текст пуша клиенту: content_strings/order_status (с подстановкой {service}),
-    иначе локальный ORDER_STATUS_INFO как запасной вариант."""
+    иначе локальный ORDER_STATUS_INFO как запасной вариант. canceled -> None всегда."""
+    if status == "canceled":
+        return None
     db_text = await get_order_status_text(status, service_type)
     if db_text:
         # Тексты в БД — обычные, без разметки (miniapp шлёт их без parse_mode);
