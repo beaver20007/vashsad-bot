@@ -2446,3 +2446,15 @@ jsonb-строке. Бот без подстановки отправил бы �
   услуги.
 - PR #36 по-прежнему не смёржен — ждёт подтверждения владельца нового
   формата и отдельной команды на мерж.
+
+### 2026-09-24 — PR #36 смёржен
+
+Владелец лично подтвердил оба живых теста (подстановка `{service}` и
+чистый формат без заголовка/строки услуги) и дал команду на мерж. CI
+(`pytest`/`ruff` informational) — `pass`/`pass`, head PR = `14dde73`,
+GitHub `MERGEABLE`, файлы PR (`admin_bot_handlers.py`,
+`content_texts.py`, `tests/test_content_texts.py`) не пересекаются с
+докс-коммитами на main. `gh pr merge --merge --delete-branch` → merge
+commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
+`6 failed (старые), 60 passed, 11 skipped`. Worktree и ветка удалены.
+Активных треков нет.

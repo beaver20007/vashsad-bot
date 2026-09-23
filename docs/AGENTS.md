@@ -10,9 +10,7 @@
 Полная сводка: docs/ORCHESTRATOR.md, записи «2026-09-09», «2026-09-10»,
 «2026-09-14», «2026-09-23».
 
-| Трек | Ветка | PR | Статус |
-|---|---|---|---|
-| order-status-service-placeholder | `feat/t-order-status-service-placeholder` | #36 | открыт, не смёржен — ждёт владельца; живой тест доставки ждёт разрешения |
+Активных треков нет.
 
 - (рекомендация, не трек, всё ещё открыта) — `vashsad-miniapp/bot/`
   удалить: не PR, текст владельцу — чужой репозиторий.
@@ -21,6 +19,7 @@
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| order-status-service-placeholder | `feat/t-order-status-service-placeholder` | #36, `d9a2209` | 2026-09-24 |
 | content-texts-reads | `feat/t-content-texts-reads` | #32, `a8e7951` | 2026-09-23 |
 | design-content-texts-migration | `feat/t-design-content-texts-migration` | #31, `7f26766` | 2026-09-23 |
 | bot-username-defaults | `fix/t-bot-username-defaults` | #35, `43cdcbf` | 2026-09-14 |
