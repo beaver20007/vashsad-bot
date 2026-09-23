@@ -384,13 +384,9 @@ async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
         try:
             # main_bot, не bot: клиент переписывается с основным ботом
             # (TELEGRAM_BOT_TOKEN), не с этим админ-ботом — см. admin_bot.py.
-            await main_bot.send_message(
-                row["telegram_id"],
-                f"📋 <b>Обновление по заявке #{order_id}</b>\n\n"
-                f"Услуга: {row['service_name'] or '—'}\n\n"
-                f"{msg_text}",
-                parse_mode="HTML",
-            )
+            # Только чистый текст статуса, без заголовка/строки услуги —
+            # как в miniapp (решение владельца 23.09.2026).
+            await main_bot.send_message(row["telegram_id"], msg_text, parse_mode="HTML")
         except Exception as e:
             log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
 
@@ -508,7 +504,6 @@ async def cmd_update_order(message: Message, main_bot: Bot):
         await message.answer(f"Заявка #{order_id} не найдена")
         return
 
-    service_label = row.get("service_name") or row.get("service_type") or "Заявка"
     user_msg = await _status_client_text(status, row.get("service_type"))
     notified = False
     notify_allowed = True
@@ -522,13 +517,7 @@ async def cmd_update_order(message: Message, main_bot: Bot):
     if user_msg and row["telegram_id"] and notify_allowed:
         try:
             # main_bot: клиент переписывается с основным ботом, не с этим.
-            await main_bot.send_message(
-                row["telegram_id"],
-                f"📋 <b>Обновление по заявке #{order_id}</b>\n"
-                f"Услуга: {service_label}\n\n"
-                f"{user_msg}",
-                parse_mode="HTML",
-            )
+            await main_bot.send_message(row["telegram_id"], user_msg, parse_mode="HTML")
             notified = True
         except Exception as e:
             log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
