@@ -5,7 +5,7 @@ from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import DESIGNER_TELEGRAM_ID
+from config import DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2
 from services.database import get_pool
 
 router = Router()
@@ -61,18 +61,21 @@ async def cb_nps(callback: CallbackQuery):
         parse_mode="HTML",
     )
 
-    # Уведомляем дизайнера о низкой оценке
-    if score <= 2 and DESIGNER_TELEGRAM_ID:
-        try:
-            await callback.bot.send_message(
-                DESIGNER_TELEGRAM_ID,
-                f"⚠️ <b>Низкая оценка NPS!</b>\n\n"
-                f"Заявка #{order_id} — оценка {score}/5\n"
-                f"Пользователь: @{callback.from_user.username or callback.from_user.id}",
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
+    # Уведомляем дизайнера(ов) о низкой оценке
+    if score <= 2:
+        for designer_id in [DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2]:
+            if not designer_id:
+                continue
+            try:
+                await callback.bot.send_message(
+                    designer_id,
+                    f"⚠️ <b>Низкая оценка NPS!</b>\n\n"
+                    f"Заявка #{order_id} — оценка {score}/5\n"
+                    f"Пользователь: @{callback.from_user.username or callback.from_user.id}",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
 
     await callback.answer()
 

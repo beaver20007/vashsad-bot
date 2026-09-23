@@ -22,13 +22,36 @@ from services.database import get_ab_stats, get_designer_stats, get_pool, update
 router = Router()
 log = logging.getLogger(__name__)
 
-ORDER_STATUSES = {
-    "new":        "🆕 Новая",
-    "in_progress": "🔄 В работе",
-    "review":     "👀 На согласовании",
-    "done":       "✅ Выполнена",
-    "canceled":   "❌ Отменена",
+# Единый источник по статусу заявки: админский лейбл (список/карточка) +
+# текст push-уведомления клиенту при смене статуса. Раньше это были два
+# независимых словаря (ORDER_STATUSES + status_texts внутри cb_set_status) —
+# консолидированы в один трек chore/t-remove-dead-code-and-hardcodes.
+ORDER_STATUS_INFO: dict[str, dict[str, str]] = {
+    "new": {
+        "label": "🆕 Новая",
+    },
+    "in_progress": {
+        "label": "🔄 В работе",
+        "client_text": "🔄 Ваша заявка <b>принята в работу</b>! Дизайнер уже занимается вашим проектом.",
+    },
+    "review": {
+        "label": "👀 На согласовании",
+        "client_text": "👀 Ваша заявка <b>на согласовании</b>. Ожидайте обратной связи.",
+    },
+    "done": {
+        "label": "✅ Выполнена",
+        # Решение владельца 10.09.2026: единая формулировка на всех
+        # поверхностях (бот + miniapp) для этого статуса.
+        "client_text": "✅ Ваша заявка <b>выполнена</b>! Пожалуйста, оставьте отзыв в приложении.",
+    },
+    "canceled": {
+        "label": "❌ Отменена",
+        "client_text": "❌ Ваша заявка <b>отменена</b>. Если есть вопросы — напишите нам.",
+    },
 }
+
+# Обратная совместимость для мест, читающих только лейбл.
+ORDER_STATUSES = {key: info["label"] for key, info in ORDER_STATUS_INFO.items()}
 
 # Фильтры /orders. "Отвечено" — не статус заявки (тот остаётся клиентским
 # жизненным циклом new/in_progress/review/done/canceled), а отдельный флаг
@@ -325,19 +348,22 @@ async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
             "UPDATE orders SET status=$1 WHERE id=$2 RETURNING telegram_id, service_name",
             new_status, order_id,
         )
+        if row:
+            notify_row = await conn.fetchrow(
+                "SELECT notify_order_status FROM users WHERE telegram_id=$1", row["telegram_id"],
+            )
 
     if not row:
         await callback.answer("Ошибка обновления", show_alert=True)
         return
 
+    # users.notify_order_status (миграция 012 в vashsad-miniapp, общая БД) —
+    # тот же флаг, что уже соблюдает miniapp в orders/[id]/status/route.ts.
+    # NULL/отсутствие строки = разрешено (дефолт TRUE).
+    notify_allowed = notify_row is None or notify_row["notify_order_status"] is not False
+
     label = ORDER_STATUSES.get(new_status, new_status)
-    status_texts = {
-        "in_progress": "🔄 Ваша заявка <b>принята в работу</b>! Дизайнер уже занимается вашим проектом.",
-        "review":      "👀 Ваша заявка <b>на согласовании</b>. Ожидайте обратной связи.",
-        "done":        "✅ Ваша заявка <b>выполнена</b>! Свяжитесь с дизайнером для получения результатов.",
-        "canceled":    "❌ Ваша заявка <b>отменена</b>. Если есть вопросы — напишите нам.",
-    }
-    msg_text = status_texts.get(new_status)
+    msg_text = ORDER_STATUS_INFO.get(new_status, {}).get("client_text") if notify_allowed else None
     if msg_text:
         try:
             # main_bot, не bot: клиент переписывается с основным ботом
@@ -466,23 +492,18 @@ async def cmd_update_order(message: Message, main_bot: Bot):
         await message.answer(f"Заявка #{order_id} не найдена")
         return
 
-    STATUS_LABELS = {
-        "new":         "🆕 Новая",
-        "in_progress": "🔄 В работе",
-        "review":      "👀 На согласовании",
-        "done":        "✅ Выполнена",
-        "canceled":    "❌ Отменена",
-    }
-    STATUS_MSGS = {
-        "in_progress": "🔄 <b>Ваша заявка принята в работу!</b>\n\nДизайнер приступил к работе над вашим проектом.",
-        "review":      "👀 <b>Проект на согласовании</b>\n\nМы подготовили материалы. Свяжемся с вами.",
-        "done":        "✅ <b>Проект выполнен!</b>\n\nОставьте отзыв в приложении 🌿",
-        "canceled":    "❌ <b>Заявка отменена.</b>\n\nЕсли есть вопросы — напишите нам.",
-    }
     service_label = row.get("service_name") or row.get("service_type") or "Заявка"
-    user_msg = STATUS_MSGS.get(status)
+    user_msg = ORDER_STATUS_INFO.get(status, {}).get("client_text")
     notified = False
+    notify_allowed = True
     if user_msg and row["telegram_id"]:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            notify_row = await conn.fetchrow(
+                "SELECT notify_order_status FROM users WHERE telegram_id=$1", row["telegram_id"],
+            )
+        notify_allowed = notify_row is None or notify_row["notify_order_status"] is not False
+    if user_msg and row["telegram_id"] and notify_allowed:
         try:
             # main_bot: клиент переписывается с основным ботом, не с этим.
             await main_bot.send_message(
@@ -495,8 +516,13 @@ async def cmd_update_order(message: Message, main_bot: Bot):
             notified = True
         except Exception as e:
             log.warning("Не удалось уведомить пользователя %s: %s", row["telegram_id"], e)
-    label = STATUS_LABELS.get(status, status)
-    note = "Пользователь уведомлён" if notified else "Уведомление не отправлено (нет сообщения для этого статуса)"
+    label = ORDER_STATUSES.get(status, status)
+    if notified:
+        note = "Пользователь уведомлён"
+    elif user_msg and not notify_allowed:
+        note = "Уведомление не отправлено (клиент отключил их в профиле)"
+    else:
+        note = "Уведомление не отправлено (нет сообщения для этого статуса)"
     await message.answer(f"✅ Заявка #{order_id} обновлена\nСтатус: {label}\n{note}")
 
 

@@ -2015,3 +2015,280 @@
   механическими волнами + 140 line-length, минус 2 новых SIM108).
   Осталось осознанно нетронутым: 27+2=29 находок «требует разбора» +
   46 остаточных E501 (>120 символов) — отдельный трек, не эта ночь.
+
+## 2026-09-09 — Ночная подготовка бот→miniapp-thin-layer (7 треков, НИЧЕГО не смёржено)
+
+Бриф владельца: подготовить (не смержить) серию PR, двигающих бота от
+собственного источника правды (тексты/цены/стили) к тонкому слою над
+общей БД miniapp. RED-запреты на сегодня: не мержить, не применять
+миграцию, не трогать пароль БД/BotFather/вебхуки/токены, не удалять
+физически ничего (только предлагать).
+
+- **Трек 1 (read-only, факт)**: `railway status --json` для сервиса
+  `vashsad-bot` → `commitHash=0a2c29dd3d80e4143446cd431a5495e7cf69ff48`,
+  `repo=beaver20007/vashsad-bot`. Точное совпадение с локальным
+  `git log -1` в `vashsad-full`. На проде — именно этот репозиторий,
+  не `vashsad-miniapp/bot/`.
+- **Трек 2** (`chore/t-remove-dead-code-and-hardcodes`, PR #29,
+  `4e8bf35`): удалён мёртвый `SERVICES`/`services_keyboard()`
+  (репо-широкий grep на `services_keyboard|service:` — 0 живых
+  вызовов) + 5 тестов на него; 4 захардкоженные Cyrillic-кнопки стиля
+  в `plan.py` заменены на свободный текст + WebApp-кнопку в каталог
+  miniapp (`?screen=styles`); в `admin_bot_handlers.py` найдены ДВЕ (не
+  три, как в брифе) независимые копии словаря статус→текст
+  (`cb_set_status`'s `status_texts` + `cmd_update_order`'s
+  `STATUS_LABELS`/`STATUS_MSGS`) — консолидированы в `ORDER_STATUS_INFO`
+  (третья копия — в другом репо, `vashsad-miniapp`'s `route.ts`).
+  `pytest tests/` → `6 failed, 41 passed, 11 skipped` (база минус 5
+  удалённых тестов).
+- **Трек 3** (`fix/t-portfolio-designer2-notify-gate`, PR #30,
+  `867058c`): `/portfolio` 404 (`{MINI_APP_URL}/portfolio` →
+  `?screen=portfolio`); `DESIGNER_TELEGRAM_ID_2` вынесен в `config.py`
+  и доведён до паритета в `booking.py`/`feedback.py`/
+  `services/scheduler.py` (реальные точки отправки дизайнеру);
+  `promo.py` НЕ тронут — там нет отправки уведомлений, только
+  admin-гейты на `DESIGNER_TELEGRAM_ID` (отклонение от списка файлов в
+  брифе, по факту); `users.notify_order_status` (та же колонка,
+  миграция 012 в miniapp, общая БД) теперь проверяется перед пушем
+  клиенту в обоих местах `admin_bot_handlers.py`. `pytest tests/` →
+  база не сдвинулась (`6 failed, 46 passed, 11 skipped`).
+- **Трек 4** (`feat/t-design-content-texts-migration`, PR #31,
+  `5155108`): ДИЗАЙН миграции `content_texts` (key-value: статусы
+  заявки + строка позиционирования дизайнера) — НЕ применена, лежит в
+  `db/migrations_proposed/` (у бота нет своего раннера миграций;
+  настоящий — `vashsad-miniapp/db/migrate.py`). README рядом объясняет
+  путь переноса в другой репозиторий при реальном накате.
+- **Трек 5** (`feat/t-content-texts-reads`, PR #32, `dd80109`):
+  `services/content_texts.py::get_designer_qualification_line()` —
+  тихо падает на текущий хардкод, если таблицы ещё нет; подключено во
+  все живые места с текстом «Дипломированный ландшафтный дизайнер»
+  (`pdf_generator.py` x2, `plan.py`, `season_plan.py`, `guide.py`,
+  `export.py`). `setup_bot.py` (разовый офлайн-скрипт) сознательно не
+  подключён — оставлен с комментарием-указателем.
+- **Трек 6** (`docs/t-fix-claude-md-redis-var`, PR #33, `8f0354c`):
+  `CLAUDE.md` документировал `UPSTASH_REDIS_REST_URL/TOKEN`, хотя
+  `bot.py:85` читает только `REDIS_URL`. Исправлено. По факту та же
+  неточность есть и в `README.md` — не тронуто (трек ограничен
+  `CLAUDE.md`), оставлено на решение владельца.
+- **Трек 7 (рекомендация, НЕ исполнено)**: `vashsad-miniapp/bot/` —
+  мёртвая копия (последний коммит 2026-06-21, свои фиксированные цены,
+  8 хендлеров против 26+). Рекомендация — удалить, но это чужой
+  репозиторий: предложение передано владельцу текстом, не PR-ом (см.
+  чат/полный текст рекомендации в scratchpad сессии).
+
+**Открыто, ждёт владельца**: PR #29, #30, #31 (миграция НЕ применена),
+#32 (неактивен до наката #31), #33. Ничего не смёржено, БД не менялась,
+BotFather/вебхуки/токены не трогались, ничего не удалено физически —
+все RED-запреты брифа соблюдены. Рекомендуемый порядок мержа: #29 →
+#30 → #33 (независимы друг от друга, можно в любом порядке) → отдельно
+#31 после ревью Ани формулировки designer.qualification_line → #32
+сразу после #31 (или раньше — код неактивен без миграции, но проще
+мержить в этом порядке).
+
+## 2026-09-10 — Сведение схемы content_texts/content_strings с parallel-треком miniapp (PR#31/#32)
+
+Владелец обнаружил, что miniapp параллельно спроектировала ту же
+таблицу под тем же ночным брифингом (PR beaver20007/vashsad-miniapp#120,
+`db/migrations/020_content_strings_up.sql`) — под другим именем и
+другой формой. Задача: одно имя, одна схема, до какого-либо наката;
+плюс внести решённые владельцем значения содержимого.
+
+- **Прочитан PR#120 через `gh pr diff --repo beaver20007/vashsad-miniapp`**
+  (read-only, без прав на запись в чужой репозиторий). Схема там:
+  `content_strings(namespace VARCHAR(64), key VARCHAR(64), value JSONB,
+  updated_at TIMESTAMP, PRIMARY KEY(namespace, key))`.
+- **PR #31 переписан** (коммит `67de00d`): `content_texts` (flat
+  key+TEXT) → `content_strings` (namespace+key составной PK + JSONB) —
+  буквальная копия схемы miniapp. `updated_by` отброшен (в схеме
+  miniapp его нет). Файлы переименованы
+  `content_texts_*.sql` → `content_strings_*.sql`.
+- **designer_bio.default засеян окончательными значениями владельца**:
+  `education = "Garden Group, ТГУ — программы переподготовки «Ландшафтный
+  дизайнер»"`, `status = "Беру первые проекты"` — идентично черновику
+  miniapp, который владелец в этом же решении утвердил как финальный
+  (решение по item 3 брифа 09.09.2026-10, не требует согласования с
+  Аней — владелец сам определил формулировку).
+- **order_status.* сознательно НЕ засеян и назван явным расхождением**,
+  не решён единолично: тексты бота (`ORDER_STATUS_INFO` в
+  `admin_bot_handlers.py`) и черновик miniapp расходятся по формулировке
+  для одних и тех же `(namespace, key)` пар, обе миграции — без `ON
+  CONFLICT DO NOTHING`. Требует отдельного решения владельца по каждому
+  статусу, вне рамок сегодняшних item 1-3 (те касались только
+  service_price/budget_range/designer_bio).
+- **PR #32 обновлён** (коммит `dc41d38`): `get_text(key, default)` →
+  `get_value(namespace, key)`, парсит JSONB (asyncpg отдаёт его текстом
+  без кодека — тот же паттерн, что уже в
+  `services/database.py::insert_analytics_event`).
+  `get_designer_qualification_line()` теперь берёт
+  `designer_bio.default.education`. `DEFAULT_QUALIFICATION_LINE` в коде
+  обновлён на финальную формулировку — **становится живым текстом сразу
+  после мержа PR**, накат миграции для этого не требуется (fallback = 
+  уже верный текст). `setup_bot.py`'s `DESCRIPTION` (профиль бота в
+  BotFather) поправлен тем же решением вручную (скрипт не подключён к
+  БД).
+- Оба PR прокомментированы (`gh pr comment`) с описанием изменений,
+  ссылкой на miniapp#120 и явным напоминанием: НЕ применено, НЕ
+  смёржено — ждёт слова владельца вместе с parallel-стороной miniapp.
+- item 1 (service_price без скидки) и item 2 (budget_range отброшен) —
+  относятся к parallel-треку #119 в miniapp, не к этому репозиторию;
+  здесь не тронуто, зафиксировано как контекст, не как задача этой
+  сессии.
+
+## 2026-09-10 — Решение владельца по order_status.done (частичное разрешение конфликта)
+
+Владелец прислал первое конкретное решение по расхождению
+`order_status.*`, отмеченному вчера как неулаженное: единая
+формулировка для статуса `done` на всех поверхностях (бот + miniapp) —
+"Пожалуйста, оставьте отзыв в приложении." Остальные статусы
+(`review`/`in_progress`/`canceled`/`new`) явно отложены, не блокируют.
+
+- **PR #29** (`chore/t-remove-dead-code-and-hardcodes`, коммит
+  `0ac39a2`): `ORDER_STATUS_INFO['done']['client_text']` заменён на
+  утверждённый текст. Один источник (после вчерашней консолидации),
+  правка одной строкой покрывает оба места отправки (`cb_set_status`,
+  `cmd_update_order`).
+- **PR #31** (`feat/t-design-content-texts-migration`, коммит
+  `a37bf8d`): `order_status.done` засеян в `content_strings_up.sql`
+  тем же `ON CONFLICT DO UPDATE` паттерном, что и `designer_bio.default`
+  — первая реально решённая строка этого namespace. Остальные статусы
+  остаются явно НЕ засеянными и помечены TODO в комментарии — не
+  выбирала формулировку единолично там, где владелец её отложил.
+- **PR #32**: код там не содержит чтения `order_status` вообще (только
+  `designer_bio` — see Track 5) — нечего было менять, отмечено в
+  отчёте, не пропущено по недосмотру.
+- Оба PR прокомментированы (`gh pr comment`, через PowerShell — Bash-
+  инструмент в этой сессии временно отказал на `gh`/`cat`, переключилась
+  без потери прогресса).
+- Всё по-прежнему НЕ применено, НЕ смёржено — ждёт общего слова со всей
+  серией (включая parallel-сторону miniapp).
+
+## 2026-09-10 — Мерж PR#29/#30/#33 (владелец разрешил, независимы от контент-слоя)
+
+Владелец разрешил смержить три трека независимых от серии #31/#32
+(content_strings) — те остаются на паузе. Порядок: #33 → #29 → #30
+(последним, т.к. пересекается с #29 по файлам).
+
+- **PR #33** (`docs/t-fix-claude-md-redis-var`) → `gh pr merge --merge
+  --delete-branch` → merge commit `ad6926d`. CI (`pytest`/`ruff`
+  informational) — оба `pass` до мержа. Без пересечений по файлам ни с
+  чем — чисто.
+- **PR #29** (`chore/t-remove-dead-code-and-hardcodes`) → CI `pass`/
+  `pass` → `gh pr merge --merge --delete-branch` → merge commit
+  `7772b49`. merge-base с main на момент мержа не сдвигался
+  (`0a2c29d`) — новые коммиты main после ветвления были только
+  докс-файлы, конфликтов не было.
+- **PR #30 (`fix/t-portfolio-designer2-notify-gate`) — конфликт, как
+  и ожидалось** (пересекается с #29 по `config.py`,
+  `handlers/admin_bot_handlers.py`, `handlers/plan.py`). Резолвил в
+  worktree `vashsad-track3-real-bugs`: `git fetch` + `git merge
+  origin/main` → 2 файла с конфликт-маркерами
+  (`handlers/plan.py` — только строка импорта, `config.py` смёржился
+  автоматически без маркеров).
+  - `handlers/plan.py`: объединил импорт —
+    `DESIGNER_TELEGRAM_ID_2` (эта ветка) + `MINI_APP_URL` (пришло с
+    #29's редиректом на каталог стилей).
+  - `handlers/admin_bot_handlers.py`: два конфликта в `cb_set_status` и
+    `cmd_update_order`. Собрал итог из ОБЕИХ сторон: источник текста —
+    `ORDER_STATUS_INFO` от #29 (включает уже утверждённый владельцем
+    текст `done`), логика гейта `notify_order_status` — от #30, включая
+    трёхветочное сообщение админу ("уведомлён" / "клиент отключил" /
+    "нет текста для статуса"). Не взял ни одну сторону вслепую.
+  - Проверка после резолва: `python -m py_compile` на всех 4 изменённых
+    файлах — 0 ошибок; `pytest tests/` → `6 failed, 41 passed,
+    11 skipped` (база минус 5 тестов SERVICES, удалённых #29 — совпадает
+    с ожиданием); `ruff check` — те же 5 старых E501, ничего нового на
+    резолвленных строках.
+  - Смёржил origin/main в ветку коммитом `d37b538`, запушил, дождался
+    CI (`pytest`/`ruff` → `pass`/`pass`), проверил
+    `git merge-base --is-ancestor origin/main
+    origin/fix/t-portfolio-designer2-notify-gate` → `true` → `gh pr
+    merge 30 --merge --delete-branch` → merge commit `e0c26df`.
+- **Синхронизация локального main**: `git fetch` + `git merge
+  origin/main --ff-only` в главном рабочем дереве — fast-forward
+  `3818c65..e0c26df`, без конфликтов.
+- **Финальная проверка фактом на синхронизированном main**: `pytest
+  tests/` → `6 failed, 41 passed, 11 skipped` — та же база, что и в
+  worktree, без регрессий от объединения трёх PR разом.
+- Локальные worktree и ветки треков #29/#30/#33 удалены
+  (`git worktree remove --force` + `git branch -d`). Worktree #31/#32
+  (`vashsad-track4-content-migration`, `vashsad-track5-content-reads`)
+  оставлены как есть — на паузе.
+- ⚠️ Технический инцидент по пути: Bash-инструмент этой сессии на
+  какое-то время переставал резолвить `gh`/`cat`/`grep`/`which`
+  (пустой `PATH` внутри `/usr/bin/bash`, тот же класс проблемы, что
+  описан в CLAUDE.md про Git-for-Windows Unix-подсистему) — переключилась
+  на PowerShell для `gh`-команд, на инструмент `Grep`/`Read` вместо
+  `grep`/`cat`. Позже Bash сам восстановился (использован для финальных
+  `git`-команд без проблем). Прогресс не потерян, повторных попыток
+  тех же команд без диагностики не делала.
+- **Итог**: main теперь на `e0c26df` — мёртвый код убран, `/portfolio`
+  404 исправлен, паритет второго дизайнера восстановлен,
+  `notify_order_status` соблюдается. PR #31/#32 остаются открытыми,
+  не смёржены, ждут решения по остальным `order_status.*` и общего
+  слова с miniapp.
+
+## 2026-09-14 — Неверное имя бота (@vashsad_bot → @washsad_ai_bot), 2 PR
+
+Владелец указал: реальный живой хендл — `@washsad_ai_bot`, но 5 мест в
+коде всё ещё ссылаются на старый `@vashsad_bot`. Два из них — видны
+клиентам прямо сейчас.
+
+- **PR #34** (`fix/t-bot-username-live-surfaces`, коммит `2de2caf`) —
+  приоритетный, отдельным быстрым PR:
+  - `handlers/export.py:265` — футер PDF-экспорта избранного (каждый
+    экспорт клиента).
+  - `handlers/inline_mode.py:67` — текст ответа в inline-режиме
+    (уходит в любой чат, где клиент использует inline).
+  - **Живая проверка**: сгенерировал реальный PDF через
+    `_build_favorites_pdf()` с тестовыми данными, вытащил текст
+    `pypdf.PdfReader(...).extract_text()` — `@washsad_ai_bot`
+    присутствует, старый `@vashsad_bot` отсутствует. Не полагался на
+    "код выглядит правильно" — проверил вывод фактом.
+  - `py_compile` + `pytest tests/` → `6 failed, 41 passed, 11 skipped`
+    (база не сдвинулась); `ruff check` — 0 новых находок на
+    изменённых строках.
+- **PR #35** (`fix/t-bot-username-defaults`, коммит `410a376`) —
+  три менее срочных дефолта: `config.py:40`, `setup_bot.py:169`,
+  `.env.example:57`. `YOOKASSA_RETURN_URL` (`config.py:37`,
+  `.env.example:51`) сознательно НЕ тронут — вне периметра брифа,
+  другое назначение (URL возврата платежа, не отображаемое имя).
+  Та же проверка: `py_compile`/`pytest` — база не сдвинулась; `ruff
+  check` → `All checks passed!`.
+- Worktree обоих треков удалены после пуша (ветки на origin остались,
+  ничего не потеряно) — рабочее дерево `main` не трогалось помимо этой
+  записи.
+- Оба PR **НЕ смёржены** — ждут слова владельца, как и было
+  оговорено.
+
+## 2026-09-14 (продолжение) — Мерж PR#34/#35 (владелец подтвердил приёмку)
+
+Владелец разрешил мерж, оба трека независимы друг от друга и от
+остальной серии.
+
+- CI (`pytest`/`ruff` informational) — `pass`/`pass` на обоих PR перед
+  мержем.
+- Файлы не пересекаются (`handlers/export.py`+`handlers/inline_mode.py`
+  у #34 против `config.py`+`setup_bot.py`+`.env.example` у #35) —
+  проверил через `gh pr diff --name-only` перед мержем.
+- **PR #34** → `gh pr merge --merge --delete-branch` → merge commit
+  `b2a7da9`.
+- **PR #35** → `git merge-base --is-ancestor origin/main
+  origin/fix/t-bot-username-defaults` вернул `false` (main успел уйти
+  вперёд на merge-коммит #34), но т.к. файлы не пересекаются — просто
+  смержил: `gh pr merge --merge --delete-branch` → чисто, без
+  конфликта, merge commit `43cdcbf`.
+- Синхронизация локального main: `git fetch` + `git merge origin/main
+  --ff-only` — fast-forward `108db66..43cdcbf`, 5 файлов.
+- **Финальная проверка фактом**: `pytest tests/` на синхронизированном
+  main → `6 failed, 41 passed, 11 skipped` — база не сдвинулась.
+  `grep` по `*.py` на `washsad_ai_bot|vashsad_bot` подтвердил: все 5
+  заявленных мест теперь на `washsad_ai_bot`; из старого хендла
+  остались только `YOOKASSA_RETURN_URL` (вне периметра брифа) и
+  докстринг-комментарий в `inline_mode.py:1` (не входил в список
+  брифа, не клиенто-видимый).
+- Локальные ветки треков удалены (`git branch -d`), worktree уже были
+  удалены на прошлом шаге.
+- **Итог**: main теперь на `43cdcbf` (на GitHub — оба merge-коммита
+  через `gh pr merge` ушли туда напрямую). Оба клиенто-видимых бага с
+  неверным именем бота исправлены — Railway auto-deploy на push в
+  `main` подхватит их без отдельного действия.

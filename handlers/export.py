@@ -263,7 +263,7 @@ def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_L
 
     elems.append(Spacer(1, 0.5*cm))
     elems.append(Paragraph(
-        f"ВашСад · {qualification_line} · Нижегородская и Владимирская области · @vashsad_bot",
+        f"ВашСад · {qualification_line} · Нижегородская и Владимирская области · @washsad_ai_bot",
         footer_style,
     ))
 

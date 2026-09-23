@@ -10,7 +10,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import DESIGNER_TELEGRAM_ID, MINI_APP_URL
+from config import DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
 
@@ -363,7 +363,8 @@ async def send_newsletter_blast(bot: Bot) -> None:
 
 
 async def self_ping_check(bot: Bot) -> None:
-    """Каждые 10 минут проверяет health-check miniapp и уведомляет дизайнера при сбое."""
+    """Каждые 10 минут проверяет health-check miniapp и уведомляет дизайнеров при сбое."""
+    designer_ids = [d for d in (DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2) if d]
     try:
         async with aiohttp.ClientSession() as s:
             async with s.get(
@@ -371,15 +372,17 @@ async def self_ping_check(bot: Bot) -> None:
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as r:
                 if r.status != 200:
-                    await bot.send_message(
-                        DESIGNER_TELEGRAM_ID,
-                        f"⚠️ Health check failed! HTTP {r.status}"
-                    )
+                    for designer_id in designer_ids:
+                        try:
+                            await bot.send_message(designer_id, f"⚠️ Health check failed! HTTP {r.status}")
+                        except Exception:
+                            pass
     except Exception:
-        try:
-            await bot.send_message(DESIGNER_TELEGRAM_ID, "⚠️ Miniapp не отвечает!")
-        except Exception:
-            pass
+        for designer_id in designer_ids:
+            try:
+                await bot.send_message(designer_id, "⚠️ Miniapp не отвечает!")
+            except Exception:
+                pass
 
 
 _scheduler_instance: AsyncIOScheduler | None = None

@@ -42,27 +42,6 @@ def price_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def services_keyboard() -> InlineKeyboardMarkup:
-    """Список стартовых услуг"""
-    from config import SERVICES
-    builder = InlineKeyboardBuilder()
-    for key, svc in SERVICES.items():
-        if key == "project":
-            continue
-        price_str = f"{svc['price']:,} ₽".replace(",", " ")
-        builder.row(
-            InlineKeyboardButton(
-                text=f"{svc['name']} — {price_str}",
-                callback_data=f"service:{key}"
-            )
-        )
-    builder.row(
-        InlineKeyboardButton(text="🏡 Индивидуальный проект", callback_data="order:project"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️ Назад", callback_data="menu:price"),
-    )
-    return builder.as_markup()
 
 
 def order_confirm_keyboard(service_key: str) -> InlineKeyboardMarkup:

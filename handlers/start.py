@@ -356,7 +356,7 @@ async def cmd_portfolio(message: Message):
     builder.row(
         InlineKeyboardButton(
             text="🌿 Смотреть портфолио в приложении",
-            web_app=WebAppInfo(url=f"{MINI_APP_URL}/portfolio"),
+            web_app=WebAppInfo(url=f"{MINI_APP_URL}?screen=portfolio"),
         )
     )
     builder.row(
