@@ -2370,3 +2370,43 @@ BotFather/вебхуки/токены не трогались, ничего не
   отдаёт честную формулировку из общей с miniapp таблицы
   `content_strings`, проверено прямым SQL-запросом и сгенерированным
   PDF, не предположением по совпадению строк.
+
+## 2026-09-23 (вечер) — order-status-service-placeholder: подстановка {service} в тексте in_progress
+
+Контекст: miniapp PR#155 (main `7e08cc4`) перенесла тексты статусов в
+`content_strings/order_status`; у `in_progress` теперь шаблон
+«Мы уже работаем над Вашим {service} …» + `service_words` в той же
+jsonb-строке. Бот без подстановки отправил бы клиенту сырой `{service}`.
+
+- **Разведка (read-only)**: прямой SELECT по `content_strings` на
+  реальной БД — 5 строк `order_status` + `designer_bio`;
+  `service_words = {project: проектом, container: контейнерным
+  озеленением, flowerbed: цветником}` лежит внутри строки `in_progress`.
+  Реальные `orders.service_type` на проде: `project` (3), `plan` (1).
+- **Отклонение от брифа**: «таблицы маппинга service_type → слова»
+  нет. Слова — в БД (`service_words`), а правило service_type →
+  категория (`custom_flowerbed`/`flowerbed` → flowerbed, `container*` →
+  container, всё остальное → project) — это КОД miniapp
+  (`lib/content.ts::orderServiceCategory`). В боте зеркалирую правило
+  (`services/content_texts.py::order_service_category`), слова не
+  дублирую — читаю из строки БД; отдельного списка слов в боте нет.
+- **PR #36** (`feat/t-order-status-service-placeholder`, `5abb6f5`):
+  `get_order_status_text(status, service_type)` для in_progress/review/
+  done (тот же набор, что NOTIFY_STATUSES в miniapp); нет таблицы/строки/
+  слова → `None` → прежний локальный текст, сырой плейсхолдер клиенту не
+  уходит. Оба пути пуша (`cb_set_status`, `cmd_update_order`) переведены;
+  DB-текст экранируется `html.escape` (бот шлёт parse_mode=HTML, тексты
+  в БД — plain).
+- **Не решено, вынесено владельцу**: (1) `canceled` — miniapp по решению
+  23.09 ничего не шлёт, бот шлёт локальный текст — не трогала; (2)
+  `review` у бота теперь берётся из БД → сменится с «на согласовании…» на
+  «Мы приняли заявку и скоро с Вами свяжемся!».
+- **Проверка**: `pytest tests/` → `6 failed (старые), 59 passed (41 + 18
+  новых), 11 skipped`; ruff по новым файлам чисто. Живая read-only
+  проверка на реальной БД (без отправки сообщений, пул создан напрямую
+  без `init_db`, чтобы не гонять DDL по проду): concept/project/plan/None
+  → «проектом», custom_flowerbed → «цветником», container_garden →
+  «контейнерным озеленением», сырого `{service}` нигде нет.
+- **Живой тест доставки в Telegram НЕ выполнен** — нужен явный ход
+  владельца на telegram_id 1288492012 (заявок на его аккаунте не создавала).
+- Не смёржено — ждёт слова владельца.
