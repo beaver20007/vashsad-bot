@@ -6,23 +6,19 @@
 
 ## Активные треки
 
-Ночь 2026-09-09 (бот→miniapp-thin-layer, 7 треков брифа). 10.09.2026
-владелец разрешил мерж #29/#30/#33 (независимы от контент-слоя) — все
-три смёржены, см. архив ниже. #31/#32 (content_strings) остаются на
-паузе — ждут общего слова вместе с parallel-стороной miniapp
-(PR beaver20007/vashsad-miniapp#120). Полная сводка: docs/ORCHESTRATOR.md,
-записи «2026-09-09» и «2026-09-10».
+Пусто — все треки серии 2026-09-09/23 (бот→miniapp-thin-layer)
+смёржены, см. архив ниже. Полная сводка: docs/ORCHESTRATOR.md, записи
+«2026-09-09», «2026-09-10», «2026-09-14», «2026-09-23».
 
-| Трек | Ветка | PR | Статус |
-|---|---|---|---|
-| design-content-texts-migration | `feat/t-design-content-texts-migration` | #31 | открыт, не смёржен — миграция НЕ применена; схема сверена с miniapp#120, order_status.done решён, остальные статусы TODO |
-| content-texts-reads | `feat/t-content-texts-reads` | #32 | открыт, не смёржен — код неактивен до наката #31 |
-| (рекомендация, не трек) | vashsad-miniapp/bot/ — удалить | — | не PR, текст владельцу — чужой репозиторий |
+- (рекомендация, не трек, всё ещё открыта) — `vashsad-miniapp/bot/`
+  удалить: не PR, текст владельцу — чужой репозиторий.
 
 ## Архив (смёржено, ветка/worktree удалены)
 
 | Трек | Ветка (была) | PR | Дата мержа |
 |---|---|---|---|
+| content-texts-reads | `feat/t-content-texts-reads` | #32, `a8e7951` | 2026-09-23 |
+| design-content-texts-migration | `feat/t-design-content-texts-migration` | #31, `7f26766` | 2026-09-23 |
 | bot-username-defaults | `fix/t-bot-username-defaults` | #35, `43cdcbf` | 2026-09-14 |
 | bot-username-live-surfaces | `fix/t-bot-username-live-surfaces` | #34, `b2a7da9` | 2026-09-14 |
 | portfolio-designer2-notify-gate | `fix/t-portfolio-designer2-notify-gate` | #30, `e0c26df` | 2026-09-10 |
