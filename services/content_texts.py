@@ -46,3 +46,55 @@ async def get_designer_qualification_line() -> str:
     if bio and bio.get("education"):
         return bio["education"]
     return DEFAULT_QUALIFICATION_LINE
+
+
+# Статусы, тексты которых бот берёт из content_strings/order_status — тот же
+# набор, что NOTIFY_STATUSES в miniapp (app/api/orders/[id]/status/route.ts).
+# canceled сюда сознательно НЕ входит: miniapp по решению владельца
+# (23.09.2026) на отмену клиенту ничего не шлёт, а бот сегодня шлёт —
+# расхождение вынесено владельцу, поведение бота не менялось.
+CONTENT_STATUSES = frozenset({"in_progress", "review", "done"})
+
+SERVICE_PLACEHOLDER = "{service}"
+
+
+def order_service_category(service_type: str | None) -> str:
+    """service_type заявки -> категория слова для {service}.
+
+    Зеркало orderServiceCategory() из vashsad-miniapp/lib/content.ts (правило
+    живёт в коде miniapp, не в БД): custom_flowerbed/flowerbed -> flowerbed,
+    container* -> container, всё остальное (id позиций прайса, legacy
+    project и plan) -> project (решение владельца 23.09.2026).
+    """
+    s = (service_type or "").lower()
+    if s in ("custom_flowerbed", "flowerbed"):
+        return "flowerbed"
+    if s.startswith("container"):
+        return "container"
+    return "project"
+
+
+async def get_order_status_text(status: str, service_type: str | None) -> str | None:
+    """Текст клиенту по статусу из content_strings/order_status, {service} уже подставлен.
+
+    Слова берутся из service_words самой строки БД (общий источник с miniapp),
+    в боте отдельного списка слов нет. None = «нет готового текста» (статус
+    вне CONTENT_STATUSES, таблицы/строки нет, у шаблона нет слова для
+    категории) — вызывающий код падает на прежний локальный текст, так что
+    клиент никогда не увидит сырой плейсхолдер.
+    """
+    if status not in CONTENT_STATUSES:
+        return None
+    row = await get_value("order_status", status)
+    if not row:
+        return None
+    template = row.get("notify_text")
+    if not template:
+        return None
+    if SERVICE_PLACEHOLDER not in template:
+        return template
+    word = (row.get("service_words") or {}).get(order_service_category(service_type))
+    if not word:
+        log.warning("order_status/%s: нет слова service_words для %r — локальный текст", status, service_type)
+        return None
+    return template.replace(SERVICE_PLACEHOLDER, word)

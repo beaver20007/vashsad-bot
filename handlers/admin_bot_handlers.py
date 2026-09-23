@@ -3,6 +3,7 @@
 Перенесено (не дублировано) из handlers/admin.py и handlers/moderation.py основного бота
 (трек scaffold-admin-bot). Оригиналы там удалены — см. docs/AGENTS.md.
 """
+import html
 import logging
 
 from aiogram import Bot, F, Router
@@ -17,6 +18,7 @@ from services.admin_auth import (
     is_owner,
     list_admins,
 )
+from services.content_texts import get_order_status_text
 from services.database import get_ab_stats, get_designer_stats, get_pool, update_order_status
 
 router = Router()
@@ -52,6 +54,17 @@ ORDER_STATUS_INFO: dict[str, dict[str, str]] = {
 
 # Обратная совместимость для мест, читающих только лейбл.
 ORDER_STATUSES = {key: info["label"] for key, info in ORDER_STATUS_INFO.items()}
+
+
+async def _status_client_text(status: str, service_type: str | None) -> str | None:
+    """Текст пуша клиенту: content_strings/order_status (с подстановкой {service}),
+    иначе локальный ORDER_STATUS_INFO как запасной вариант."""
+    db_text = await get_order_status_text(status, service_type)
+    if db_text:
+        # Тексты в БД — обычные, без разметки (miniapp шлёт их без parse_mode);
+        # пуш бота идёт с parse_mode=HTML, поэтому экранируем.
+        return html.escape(db_text)
+    return ORDER_STATUS_INFO.get(status, {}).get("client_text")
 
 # Фильтры /orders. "Отвечено" — не статус заявки (тот остаётся клиентским
 # жизненным циклом new/in_progress/review/done/canceled), а отдельный флаг
@@ -345,7 +358,7 @@ async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "UPDATE orders SET status=$1 WHERE id=$2 RETURNING telegram_id, service_name",
+            "UPDATE orders SET status=$1 WHERE id=$2 RETURNING telegram_id, service_name, service_type",
             new_status, order_id,
         )
         if row:
@@ -363,7 +376,7 @@ async def cb_set_status(callback: CallbackQuery, main_bot: Bot):
     notify_allowed = notify_row is None or notify_row["notify_order_status"] is not False
 
     label = ORDER_STATUSES.get(new_status, new_status)
-    msg_text = ORDER_STATUS_INFO.get(new_status, {}).get("client_text") if notify_allowed else None
+    msg_text = await _status_client_text(new_status, row["service_type"]) if notify_allowed else None
     if msg_text:
         try:
             # main_bot, не bot: клиент переписывается с основным ботом
@@ -493,7 +506,7 @@ async def cmd_update_order(message: Message, main_bot: Bot):
         return
 
     service_label = row.get("service_name") or row.get("service_type") or "Заявка"
-    user_msg = ORDER_STATUS_INFO.get(status, {}).get("client_text")
+    user_msg = await _status_client_text(status, row.get("service_type"))
     notified = False
     notify_allowed = True
     if user_msg and row["telegram_id"]:
