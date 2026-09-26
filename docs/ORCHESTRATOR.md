@@ -2494,3 +2494,7 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 - #40 -> d93295c (ruff 75->45, все E501; немые except логируются), #41 -> 7c02e72 (VAPID-проверка, @vashsad_bot, UPSTASH_REDIS_REST). Деплой SUCCESS, живой /start OK; pytest 73 passed / 0 failed.
 - Миграция DROP COLUMN users.push_subscription НЕ готовилась и НЕ применялась: колонку использует miniapp (app/api/push/subscribe, push/send, admin/push-send). Ждёт отдельного трека в miniapp.
 - Серия 2026-09-26 (PR #37-#41) закрыта. Открыто: seed_bot_texts.py --apply (слово владельца), вопросы владельцу/Ане (см. запись выше).
+
+### 2026-09-26 - решения владельца
+- max-integration/ на main: оставлено по решению владельца 26.09.2026, не трогать до возобновления MAX-переноса (Ф26).
+- budget_range: колонка в схеме и save_order не трогаются; в CSV-экспорте подпись исправлена на реальное содержимое (service_price), PR fix/csv-budget-label.
