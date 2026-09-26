@@ -12,6 +12,7 @@ import redis.asyncio as aioredis
 import sentry_sdk
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.fsm.storage.base import DefaultKeyBuilder
 from aiogram.fsm.storage.redis import RedisStorage
 from dotenv import load_dotenv
 
@@ -59,6 +60,21 @@ if os.getenv("SENTRY_DSN"):
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# Redis общий с другими ботами, а ключи aiogram по умолчанию (fsm:<chat>:<user>:...) без id бота и
+# пересекаются: FSMContext.clear() одного бота стирает state и data того же пользователя в другом.
+# Свой префикс + bot_id разводят ключи; TTL 24 ч не даёт брошенной анкете висеть вечно.
+FSM_KEY_PREFIX = "vashsad_fsm"
+FSM_TTL_SECONDS = 24 * 60 * 60
+
+
+def make_fsm_storage(redis) -> RedisStorage:
+    return RedisStorage(
+        redis=redis,
+        key_builder=DefaultKeyBuilder(prefix=FSM_KEY_PREFIX, with_bot_id=True),
+        state_ttl=FSM_TTL_SECONDS,
+        data_ttl=FSM_TTL_SECONDS,
+    )
+
 
 async def main():
     # ── База данных (Neon PostgreSQL) ──
@@ -87,7 +103,7 @@ async def main():
         encoding="utf-8",
         decode_responses=True,
     )
-    storage = RedisStorage(redis=redis)
+    storage = make_fsm_storage(redis)
 
     dp = Dispatcher(storage=storage)
 
