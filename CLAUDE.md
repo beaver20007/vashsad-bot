@@ -45,6 +45,7 @@ vashsad-full/
     ├── email_service.py          # Email через Resend
     ├── sms_service.py            # SMS через smsc.ru
     ├── pdf_generator.py          # Генерация PDF-отчётов
+    ├── bot_texts.py              # Тексты бота из content_strings (запасной вариант — content/bot_texts_defaults.json)
     ├── scheduler.py              # Планировщик задач (apscheduler)
 ```
 

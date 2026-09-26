@@ -39,6 +39,7 @@ from handlers.saved_replies import router as saved_replies_router
 from handlers.season_plan import router as season_plan_router
 from handlers.start import router as start_router
 from handlers.watering import router as watering_router
+from services import bot_texts
 from services.database import close_db, init_db
 from services.scheduler import setup_scheduler
 
@@ -62,6 +63,9 @@ log = logging.getLogger(__name__)
 async def main():
     # ── База данных (Neon PostgreSQL) ──
     await init_db()
+
+    # Тексты бота из content_strings (кэш; запасной вариант — файл content/)
+    await bot_texts.load()
 
     # ── SSL (Railway quirk) ──
     ssl_context = ssl.create_default_context()
