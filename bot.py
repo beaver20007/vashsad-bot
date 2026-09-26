@@ -66,6 +66,9 @@ log = logging.getLogger(__name__)
 # Свой префикс + bot_id разводят ключи; TTL 24 ч не даёт брошенной анкете висеть вечно.
 FSM_KEY_PREFIX = "vashsad_fsm"
 FSM_TTL_SECONDS = 24 * 60 * 60
+# state и data обновляют TTL раздельно (set_state / set_data). data живёт дольше на этот запас, чтобы state не
+# пережил data (иначе data["slot_id"] и др. в BookingForm дадут KeyError на исходе суток).
+FSM_DATA_TTL_MARGIN_SECONDS = 60 * 60
 
 
 def make_fsm_storage(redis) -> RedisStorage:
@@ -73,7 +76,7 @@ def make_fsm_storage(redis) -> RedisStorage:
         redis=redis,
         key_builder=DefaultKeyBuilder(prefix=FSM_KEY_PREFIX, with_bot_id=True),
         state_ttl=FSM_TTL_SECONDS,
-        data_ttl=FSM_TTL_SECONDS,
+        data_ttl=FSM_TTL_SECONDS + FSM_DATA_TTL_MARGIN_SECONDS,
     )
 
 
