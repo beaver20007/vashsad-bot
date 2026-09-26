@@ -10,7 +10,18 @@
 Полная сводка: docs/ORCHESTRATOR.md, записи «2026-09-09», «2026-09-10»,
 «2026-09-14», «2026-09-23».
 
-Активных треков нет.
+Серия 2026-09-26 (шесть технических треков из инвентаризации), все PR
+открыты, мерж только по слову владельца на каждый PR:
+
+| Трек | Ветка | PR | База | Статус |
+|---|---|---|---|---|
+| remove-sad-pro-subscription | `feat/t-remove-sad-pro-subscription` | #37 | main | ждёт слова на мерж |
+| extract-remaining-texts-to-content-strings | `feat/t-extract-texts-to-content-strings` | #38 | ветка #37 | после #37; `seed_bot_texts.py --apply` — отдельное слово |
+| fix-outdated-tests | `fix/t-outdated-tests` | #39 | main | ждёт слова; pytest 0 failed |
+| ruff-cleanup-and-logging | `chore/t-ruff-cleanup-and-logging` | #40 | ветка #38 | после #37, #38 |
+| remove-dead-webpush-and-old-branding | `chore/t-remove-dead-webpush-and-old-branding` | #41 | ветка #40 | после #40; миграция `push_subscription` НЕ готовилась (miniapp использует колонку) |
+
+После мержа базовой ветки — ретаргет следующего PR на `main`.
 
 - (рекомендация, не трек, всё ещё открыта) — `vashsad-miniapp/bot/`
   удалить: не PR, текст владельцу — чужой репозиторий.

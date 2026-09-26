@@ -2458,3 +2458,28 @@ GitHub `MERGEABLE`, файлы PR (`admin_bot_handlers.py`,
 commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 `6 failed (старые), 60 passed, 11 skipped`. Worktree и ветка удалены.
 Активных треков нет.
+
+### 2026-09-26 — шесть технических треков из инвентаризации (PR #37–#41)
+- #37 (`remove-sad-pro-subscription`, f32f372): подписка «Сад Про» убрана
+  (payment*.py, payment_service, webhook_server, storage.py, subscribe-кнопки,
+  YOOKASSA_*); лимиты Free-тира не тронуты; DDL `users.is_subscribed`,
+  `subscription_expires_at`, таблица `payments` оставлены — их использует miniapp.
+- #38 (`extract-remaining-texts`, f49eb41): тексты бота → `content_strings`,
+  namespace `bot_text`; файл-дефолт `content/bot_texts_defaults.json` с
+  логируемым fallback; `scripts/seed_bot_texts.py` (dry-run по умолчанию,
+  `--apply` НЕ запускался — нужно слово владельца). База — ветка #37.
+- #39 (`fix-outdated-tests`, 013408f): 6 упавших тестов исправлены
+  (promo: патч `get_pool`; onboarding-патч убран; FAQ «Нижнем Новгороде» —
+  реальный пробел данных FAQ, оформлен strict xfail). pytest: 0 failed.
+- #40 (`ruff-cleanup-and-logging`, ac5d419): ruff 75→45, остались только E501;
+  F821 в scheduler.py был настоящим багом (нет импорта datetime); все немые
+  `except Exception` пишут warning/error с текстом исключения. База — ветка #38.
+- #41 (`remove-dead-webpush-and-old-branding`, 40fb827): VAPID-проверка,
+  строка CHANGELOG, `@vashsad_bot` в inline_mode, `UPSTASH_REDIS_REST_*`.
+  **Блокер:** `users.push_subscription` используется miniapp
+  (`app/api/push/subscribe`, `push/send`, `admin/push-send`) — миграция DROP
+  не готовилась; сначала нужно убрать web-push из miniapp. Решение владельца.
+- Открытые вопросы владельцу: лимиты Free без сброса/апселла; подписка в
+  miniapp; промокоды; фиксированная цена «3 500 ₽» в сезонном тексте;
+  обещания в FAQ (нужна Аня); английское «certified» в welcome; onboarding
+  STYLES захардкожен; MONTHLY_TIPS/_SEASONAL_TIPS/QUICK_TIPS не вынесены.
