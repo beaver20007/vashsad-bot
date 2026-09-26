@@ -11,35 +11,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from config import DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
+from services import bot_texts
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
 
 log = logging.getLogger(__name__)
-
-SEASONAL_MESSAGES = {
-    (4, 1): (
-        "🌱 <b>Апрель — время сеять рассаду!</b>\n\n"
-        "Пора подготовить грядки и высеять томаты, перцы и баклажаны на рассаду.\n\n"
-        "💡 Совет: природный сад начинается с правильного выбора растений под ваш климат.\n\n"
-        "Нужна помощь с планом посадок? Пишите 🌿"
-    ),
-    (6, 1): (
-        "☀️ <b>Июнь — сезон активного ухода!</b>\n\n"
-        "Самое время мульчировать грядки, подкармливать многолетники и следить за влажностью.\n\n"
-        "📸 Есть проблемы с растениями? Пришлите фото — определим болезнь за секунды."
-    ),
-    (8, 15): (
-        "🍂 <b>Август — готовим сад к осени!</b>\n\n"
-        "Самое время собрать урожай, посеять сидераты и спланировать изменения на следующий год.\n\n"
-        "🗺 Хотите обновить сад весной? Сейчас лучшее время для проекта!"
-    ),
-    (10, 1): (
-        "❄️ <b>Октябрь — укрываем многолетники!</b>\n\n"
-        "Розы, гортензии и теплолюбивые растения нуждаются в укрытии до первых морозов.\n\n"
-        "📋 Нужен сезонный план ухода? Составлю персональный — <b>3 500 ₽</b> 🌿"
-    ),
-}
-
 
 async def broadcast_personalized_seasonal(bot: Bot, base_text: str) -> None:
     """Personalized seasonal broadcast using user's plant list."""
@@ -73,6 +49,15 @@ async def broadcast_personalized_seasonal(bot: Bot, base_text: str) -> None:
 async def send_test_broadcast(bot: Bot, text: str) -> None:
     """Manual test broadcast — call from admin handler."""
     await broadcast_personalized_seasonal(bot, text)
+
+
+async def broadcast_seasonal_message(bot: Bot, month: int, day: int) -> None:
+    """Сезонная рассылка: текст берётся из content_strings в момент срабатывания."""
+    for item in bot_texts.get("seasonal_messages")["items"]:
+        if item["month"] == month and item["day"] == day:
+            await broadcast_personalized_seasonal(bot, item["text"])
+            return
+    log.error("Сезонное сообщение %s-%s не найдено в content_strings/bot_text/seasonal_messages", month, day)
 
 
 async def broadcast_seasonal(bot: Bot, text: str) -> None:
@@ -390,14 +375,23 @@ _scheduler_instance: AsyncIOScheduler | None = None
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    for (month, day), text in SEASONAL_MESSAGES.items():
+    seasonal_items = bot_texts.get("seasonal_messages")["items"]
+    for item in seasonal_items:
+        month, day = item["month"], item["day"]
         scheduler.add_job(
-            broadcast_personalized_seasonal,
+            broadcast_seasonal_message,
             CronTrigger(month=month, day=day, hour=10, timezone="Europe/Moscow"),
-            args=[bot, text],
+            args=[bot, month, day],
             id=f"seasonal_{month}_{day}",
             replace_existing=True,
         )
+    scheduler.add_job(
+        bot_texts.refresh_job,
+        "interval",
+        minutes=10,
+        id="bot_texts_refresh",
+        replace_existing=True,
+    )
     scheduler.add_job(
         notify_garden_tasks,
         CronTrigger(hour=9, minute=0, timezone="Europe/Moscow"),
@@ -431,5 +425,5 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     )
     global _scheduler_instance
     _scheduler_instance = scheduler
-    log.info("📅 Планировщик настроен (%d сезонных задач + ежедневные уведомления + newsletter_blast)", len(SEASONAL_MESSAGES))
+    log.info("📅 Планировщик настроен (%d сезонных задач + ежедневные уведомления + newsletter_blast)", len(seasonal_items))
     return scheduler

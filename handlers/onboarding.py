@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from services import bot_texts
 from services.database import get_or_create_user, update_user_region
 
 router = Router()
@@ -41,8 +42,7 @@ async def _ask_region(message: Message, state: FSMContext):
     for label, value in REGIONS:
         builder.row(InlineKeyboardButton(text=label, callback_data=f"ob_region:{value}"))
     await message.answer(
-        "🌿 <b>Пара вопросов для персонализации</b>\n\n"
-        "📍 <b>В каком регионе ваш сад?</b>",
+        bot_texts.get("onboarding")["region_prompt"],
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -59,8 +59,7 @@ async def cb_region(callback: CallbackQuery, state: FSMContext):
         builder.row(InlineKeyboardButton(text=a, callback_data=f"ob_area:{a}"))
 
     await callback.message.edit_text(
-        f"📍 Регион: <b>{region}</b>\n\n"
-        "📐 <b>Площадь участка?</b>",
+        bot_texts.get("onboarding")["area_prompt"].format(region=region),
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -78,8 +77,7 @@ async def cb_area(callback: CallbackQuery, state: FSMContext):
         builder.row(InlineKeyboardButton(text=s, callback_data=f"ob_style:{s}"))
 
     await callback.message.edit_text(
-        f"📐 Площадь: <b>{area}</b>\n\n"
-        "🎨 <b>Предпочитаемый стиль сада?</b>",
+        bot_texts.get("onboarding")["style_prompt"].format(area=area),
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -101,11 +99,7 @@ async def cb_style(callback: CallbackQuery, state: FSMContext):
     b = IKB()
     b.row(InlineKeyboardButton(text="▶️ Начать", callback_data="menu:main"))
     await callback.message.edit_text(
-        f"✅ <b>Профиль сохранён!</b>\n\n"
-        f"📍 {region}\n"
-        f"📐 {area}\n"
-        f"🎨 {style}\n\n"
-        f"Теперь AI-консультации будут учитывать ваш регион и площадь участка 🌿",
+        bot_texts.get("onboarding")["saved"].format(region=region, area=area, style=style),
         parse_mode="HTML",
         reply_markup=b.as_markup(),
     )

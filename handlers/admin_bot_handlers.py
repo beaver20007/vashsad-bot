@@ -24,30 +24,23 @@ from services.database import get_ab_stats, get_designer_stats, get_pool, update
 router = Router()
 log = logging.getLogger(__name__)
 
-# Единый источник по статусу заявки: админский лейбл (список/карточка) +
-# текст push-уведомления клиенту при смене статуса. Раньше это были два
-# независимых словаря (ORDER_STATUSES + status_texts внутри cb_set_status) —
-# консолидированы в один трек chore/t-remove-dead-code-and-hardcodes.
+# Админские лейблы статуса заявки (список/карточка для Ани). Тексты клиенту
+# здесь не живут: они в content_strings/order_status (services/content_texts.py).
 ORDER_STATUS_INFO: dict[str, dict[str, str]] = {
     "new": {
         "label": "🆕 Новая",
     },
     "in_progress": {
         "label": "🔄 В работе",
-        "client_text": "🔄 Ваша заявка <b>принята в работу</b>! Дизайнер уже занимается вашим проектом.",
     },
     "review": {
         "label": "👀 На согласовании",
-        "client_text": "👀 Ваша заявка <b>на согласовании</b>. Ожидайте обратной связи.",
     },
     "done": {
         "label": "✅ Выполнена",
-        # Решение владельца 10.09.2026: единая формулировка на всех
-        # поверхностях (бот + miniapp) для этого статуса.
-        "client_text": "✅ Ваша заявка <b>выполнена</b>! Пожалуйста, оставьте отзыв в приложении.",
     },
-    # Без client_text: на отмену клиенту ничего не шлём (решение владельца
-    # 23.09.2026, как и в miniapp) — меняется только статус в БД.
+    # На отмену клиенту ничего не шлём (решение владельца 23.09.2026,
+    # как и в miniapp) — меняется только статус в БД.
     "canceled": {
         "label": "❌ Отменена",
     },
@@ -58,16 +51,17 @@ ORDER_STATUSES = {key: info["label"] for key, info in ORDER_STATUS_INFO.items()}
 
 
 async def _status_client_text(status: str, service_type: str | None) -> str | None:
-    """Текст пуша клиенту: content_strings/order_status (с подстановкой {service}),
-    иначе локальный ORDER_STATUS_INFO как запасной вариант. canceled -> None всегда."""
+    """Текст пуша клиенту из content_strings/order_status (с подстановкой {service}).
+    None -> клиенту ничего не отправляется (canceled — всегда None)."""
     if status == "canceled":
         return None
     db_text = await get_order_status_text(status, service_type)
-    if db_text:
-        # Тексты в БД — обычные, без разметки (miniapp шлёт их без parse_mode);
-        # пуш бота идёт с parse_mode=HTML, поэтому экранируем.
-        return html.escape(db_text)
-    return ORDER_STATUS_INFO.get(status, {}).get("client_text")
+    if not db_text:
+        return None
+    # Тексты в БД — обычные, без разметки (miniapp шлёт их без parse_mode);
+    # пуш бота идёт с parse_mode=HTML, поэтому экранируем.
+    return html.escape(db_text)
+
 
 # Фильтры /orders. "Отвечено" — не статус заявки (тот остаётся клиентским
 # жизненным циклом new/in_progress/review/done/canceled), а отдельный флаг

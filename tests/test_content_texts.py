@@ -59,9 +59,16 @@ def test_missing_word_falls_back_instead_of_raw_placeholder(monkeypatch):
     assert _run(content_texts.get_order_status_text("in_progress", "custom_flowerbed")) is None
 
 
-def test_no_row_returns_none(monkeypatch):
+def test_no_row_uses_defaults_file_with_substitution(monkeypatch):
+    """Нет строки в БД -> запасное значение из content/bot_texts_defaults.json, {service} подставлен."""
     _patch_row(monkeypatch, None)
-    assert _run(content_texts.get_order_status_text("in_progress", "concept")) is None
+    text = _run(content_texts.get_order_status_text("in_progress", "custom_flowerbed"))
+    assert text == "Мы уже работаем над Вашим цветником и скоро отправим его Вам!"
+
+
+def test_no_row_and_no_default_returns_none(monkeypatch):
+    _patch_row(monkeypatch, None)
+    assert _run(content_texts.get_order_status_text("new", "concept")) is None
 
 
 def test_text_without_placeholder_returned_as_is(monkeypatch):
@@ -75,7 +82,7 @@ def test_canceled_not_read_from_content(monkeypatch):
 
 
 def test_canceled_sends_nothing(monkeypatch):
-    """Ни из БД, ни из локального запасного текста: на отмену клиенту ничего не шлётся."""
+    """Ни из БД, ни из файла-дефолта: на отмену клиенту ничего не шлётся."""
     from handlers import admin_bot_handlers
 
     _patch_row(monkeypatch, {"notify_text": "не должно использоваться"})

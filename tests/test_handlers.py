@@ -24,9 +24,10 @@ class TestCheckFaq:
     def _import(self):
         # Import lazily so that missing aiogram doesn't break collection
         try:
-            from handlers.chat import FAQ_PATTERNS, check_faq
+            from handlers.chat import check_faq
+            from services import bot_texts
             self.check_faq = check_faq
-            self.FAQ_PATTERNS = FAQ_PATTERNS
+            self.FAQ_PATTERNS = bot_texts.get("faq")["items"]
         except ImportError as exc:
             pytest.skip(f"Could not import handlers.chat: {exc}")
 

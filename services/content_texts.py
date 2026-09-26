@@ -13,6 +13,7 @@ db/migrate.py).
 import json
 import logging
 
+from services import bot_texts
 from services.database import get_pool
 
 log = logging.getLogger(__name__)
@@ -77,14 +78,18 @@ async def get_order_status_text(status: str, service_type: str | None) -> str | 
     """Текст клиенту по статусу из content_strings/order_status, {service} уже подставлен.
 
     Слова берутся из service_words самой строки БД (общий источник с miniapp),
-    в боте отдельного списка слов нет. None = «нет готового текста» (статус
-    вне CONTENT_STATUSES, таблицы/строки нет, у шаблона нет слова для
-    категории) — вызывающий код падает на прежний локальный текст, так что
-    клиент никогда не увидит сырой плейсхолдер.
+    в коде бота списка слов нет (запасное значение — content/bot_texts_defaults.json).
+    None = «нет текста» (статус вне CONTENT_STATUSES, нет строки нигде, у
+    шаблона нет слова для категории) — клиенту ничего не отправляется, и он
+    никогда не увидит сырой плейсхолдер.
     """
     if status not in CONTENT_STATUSES:
         return None
     row = await get_value("order_status", status)
+    if not row:
+        row = bot_texts.default_row("order_status", status)
+        if row:
+            log.warning("order_status/%s нет в content_strings — используется файл-дефолт", status)
     if not row:
         return None
     template = row.get("notify_text")

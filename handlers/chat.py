@@ -5,7 +5,8 @@ from aiogram.types import CallbackQuery, Message
 
 from config import FREE_CHAT_LIMIT
 from keyboards import back_to_menu_keyboard
-from services.ai import SYSTEM_PROMPT, ask_claude
+from services import bot_texts
+from services.ai import ask_claude
 from services.database import (
     add_bonus_messages,
     add_message_to_history,
@@ -15,61 +16,6 @@ from services.database import (
 )
 
 router = Router()
-
-FAQ_PATTERNS = [
-    {
-        'keywords': ['цена', 'стоимость', 'сколько стоит', 'прайс', 'расценки', 'тариф'],
-        'answer': (
-            "💰 <b>Стоимость услуг дизайнера:</b>\n\n"
-            "Консультации, проекты и авторский надзор — стоимость зависит "
-            "от площади и сложности участка.\n\n"
-            "Точный расчёт — в приложении ВашСад или на консультации. "
-            "Оформите заявку — посчитаю под ваш участок! 🌿"
-        ),
-    },
-    {
-        'keywords': ['сроки', 'срок', 'как долго', 'сколько времени', 'когда готово'],
-        'answer': (
-            "⏱ <b>Сроки выполнения работ:</b>\n\n"
-            "• Консультация — 1–2 часа\n"
-            "• Дендроплан — 3–5 дней\n"
-            "• Эскизный проект — 7–14 дней\n"
-            "• Полный проект — 3–4 недели\n\n"
-            "Сроки зависят от загруженности и сложности. "
-            "Запишитесь на консультацию для точных сроков! 📅"
-        ),
-    },
-    {
-        'keywords': ['как записаться', 'записаться', 'консультация', 'как заказать', 'заказать'],
-        'answer': (
-            "📅 <b>Как записаться на консультацию:</b>\n\n"
-            "1. Нажмите /book или кнопку «📅 Консультация»\n"
-            "2. Выберите удобный слот\n"
-            "3. Укажите контактный телефон\n\n"
-            "Или напишите напрямую — отвечу в течение часа! 🌿"
-        ),
-    },
-    {
-        'keywords': ['регион', 'область', 'где работаете', 'выезд', 'нижний', 'владимир'],
-        'answer': (
-            "📍 <b>География работы:</b>\n\n"
-            "Основные регионы: Нижегородская и Владимирская области.\n\n"
-            "Выезды возможны в радиусе 200 км от Нижнего Новгорода. "
-            "Удалённые консультации — по всей России! 🗺"
-        ),
-    },
-    {
-        'keywords': ['гарантия', 'гарантии', 'если не понравится', 'возврат'],
-        'answer': (
-            "✅ <b>Гарантии:</b>\n\n"
-            "• Бесплатные правки в рамках ТЗ\n"
-            "• Авторский надзор при реализации\n"
-            "• Замена растений при гибели по вине посадки (1 год)\n\n"
-            "Работаю по договору с чёткими условиями. 🤝"
-        ),
-    },
-]
-
 
 _REGION_CLIMATE: dict[str, str] = {
     "Нижегородская обл.": "Пользователь из Нижегородской области, климатическая зона 4b. Учитывай холодные зимы (до -30°C), короткое лето, суглинистые почвы.",
@@ -91,7 +37,7 @@ def _region_climate_hint(region: str) -> str:
 
 def check_faq(text: str) -> str | None:
     text_lower = text.lower()
-    for faq in FAQ_PATTERNS:
+    for faq in bot_texts.get("faq")["items"]:
         if any(kw in text_lower for kw in faq['keywords']):
             return faq['answer']
     return None
@@ -167,7 +113,7 @@ async def handle_text_message(message: Message):
     # Формируем системный промпт с учётом региона пользователя
     if user.region:
         region_hint = _region_climate_hint(user.region)
-        system = SYSTEM_PROMPT + f"\n\nКонтекст пользователя: {region_hint}"
+        system = bot_texts.get("system_prompt.chat")["text"] + f"\n\nКонтекст пользователя: {region_hint}"
     else:
         system = None
 
