@@ -144,7 +144,9 @@ async def _create_tables() -> None:
         CREATE INDEX IF NOT EXISTS idx_analytics_events_name
             ON analytics_events(event_name, created_at DESC);
 
-        -- Платежи YooKassa
+        -- Платежи. Бот больше не принимает платежи (подписка «Сад Про» убрана
+        -- 26.09.2026), но таблица общая с miniapp (app/api/payments) — DDL
+        -- оставлен, удаление только миграцией вместе с miniapp.
         CREATE TABLE IF NOT EXISTS payments (
             id              SERIAL PRIMARY KEY,
             telegram_id     BIGINT REFERENCES users(telegram_id),
@@ -246,14 +248,12 @@ class User:
     username: str | None = None
     first_name: str | None = None
     region: str | None = None
-    is_subscribed: bool = False
     chat_count: int = 0
     photo_count: int = 0
     plants_count: int = 0
     garden_area: float | None = None
     chat_history: list = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
-    subscription_expires_at: datetime | None = None
     referral_code: str | None = None
     referred_by: int | None = None
     bonus_messages: int = 0
@@ -312,14 +312,12 @@ async def get_or_create_user(
         username=row["username"],
         first_name=row["first_name"],
         region=row["region"],
-        is_subscribed=row["is_subscribed"],
         chat_count=row["chat_count"],
         photo_count=row["photo_count"],
         plants_count=row["plants_count"],
         garden_area=row.get("garden_area") or row.get("plot_size"),
         chat_history=chat_history,
         created_at=row["created_at"],
-        subscription_expires_at=row.get("subscription_expires_at"),
         referral_code=row.get("referral_code"),
         referred_by=row.get("referred_by"),
         bonus_messages=row.get("bonus_messages") or 0,
@@ -349,11 +347,11 @@ async def update_user(user: User) -> None:
         await conn.execute(
             """UPDATE users SET
                username=$1, first_name=$2, region=$3,
-               is_subscribed=$4, chat_count=$5, photo_count=$6,
-               plants_count=$7, garden_area=$8, updated_at=NOW()
-               WHERE telegram_id=$9""",
+               chat_count=$4, photo_count=$5,
+               plants_count=$6, garden_area=$7, updated_at=NOW()
+               WHERE telegram_id=$8""",
             user.username, user.first_name, user.region,
-            user.is_subscribed, user.chat_count, user.photo_count,
+            user.chat_count, user.photo_count,
             user.plants_count, user.garden_area, user.telegram_id,
         )
 
@@ -361,15 +359,15 @@ async def update_user(user: User) -> None:
 # ── Лимиты (совместимо со старым кодом) ──
 
 def can_use_chat(user: User, limit: int) -> bool:
-    return user.is_subscribed or user.chat_count < (limit + user.bonus_messages)
+    return user.chat_count < (limit + user.bonus_messages)
 
 
 def can_use_photo(user: User, limit: int) -> bool:
-    return user.is_subscribed or user.photo_count < limit
+    return user.photo_count < limit
 
 
 def can_use_plants(user: User, limit: int) -> bool:
-    return user.is_subscribed or user.plants_count < limit
+    return user.plants_count < limit
 
 
 # ── История чата ──
@@ -669,57 +667,6 @@ async def get_referral_stats(telegram_id: int) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════
-#  PAYMENTS — YooKassa
-# ══════════════════════════════════════════════════════════════
-
-async def save_payment(
-    telegram_id: int,
-    yookassa_id: str,
-    amount: int,
-    description: str,
-    plan: str,
-) -> int:
-    async with _pool.acquire() as conn:
-        row = await conn.fetchrow(
-            """INSERT INTO payments (telegram_id, yookassa_id, amount, description, plan)
-               VALUES ($1,$2,$3,$4,$5) RETURNING id""",
-            telegram_id, yookassa_id, amount, description, plan,
-        )
-    return row["id"]
-
-
-async def get_payment_by_yookassa_id(yookassa_id: str) -> dict | None:
-    async with _pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM payments WHERE yookassa_id=$1", yookassa_id
-        )
-    return dict(row) if row else None
-
-
-async def mark_payment_succeeded(yookassa_id: str) -> int | None:
-    """Отметить платёж как успешный. Возвращает telegram_id."""
-    async with _pool.acquire() as conn:
-        row = await conn.fetchrow(
-            """UPDATE payments SET status='succeeded', updated_at=NOW()
-               WHERE yookassa_id=$1 RETURNING telegram_id, plan""",
-            yookassa_id,
-        )
-    return row if row else None
-
-
-async def activate_subscription(telegram_id: int, months: int) -> None:
-    async with _pool.acquire() as conn:
-        await conn.execute(
-            """UPDATE users SET
-               is_subscribed=TRUE,
-               subscription_expires_at=NOW() + ($1 * INTERVAL '1 month'),
-               updated_at=NOW()
-               WHERE telegram_id=$2""",
-            months, telegram_id,
-        )
-
-
-# ══════════════════════════════════════════════════════════════
 #  DESIGNER STATS — статистика для дизайнера
 # ══════════════════════════════════════════════════════════════
 
@@ -731,9 +678,6 @@ async def get_designer_stats() -> dict:
         )
         new_30d = await conn.fetchval(
             "SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days'"
-        )
-        subscribed = await conn.fetchval(
-            "SELECT COUNT(*) FROM users WHERE is_subscribed=TRUE"
         )
         total_orders = await conn.fetchval("SELECT COUNT(*) FROM orders")
         orders_7d = await conn.fetchval(
@@ -756,7 +700,6 @@ async def get_designer_stats() -> dict:
         "total_users": total_users,
         "new_7d": new_7d,
         "new_30d": new_30d,
-        "subscribed": subscribed,
         "total_orders": total_orders,
         "orders_7d": orders_7d,
         "revenue": revenue,

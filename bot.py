@@ -27,8 +27,6 @@ from handlers.moderation import BanCheckMiddleware
 from handlers.nurseries import router as nurseries_router
 from handlers.onboarding import router as onboarding_router
 from handlers.order import router as order_router
-from handlers.payment import router as payment_router
-from handlers.payment_stars import router as payment_stars_router
 from handlers.photo import router as photo_router
 from handlers.plan import router as plan_router
 from handlers.plants import router as plants_router
@@ -43,7 +41,6 @@ from handlers.start import router as start_router
 from handlers.watering import router as watering_router
 from services.database import close_db, init_db
 from services.scheduler import setup_scheduler
-from services.webhook_server import start_webhook_server
 
 load_dotenv()
 
@@ -107,13 +104,11 @@ async def main():
         price_router,
         guide_router,
         referral_router,
-        payment_router,
         feedback_router,
         booking_router,
         promo_router,
         inline_router,
         export_router,
-        payment_stars_router,
         poll_router,
         watering_router,
         nurseries_router,
@@ -143,18 +138,11 @@ async def main():
     from handlers.moderation import create_moderation_tables
     await create_moderation_tables()
 
-    # Webhook-сервер YooKassa (если настроен)
-    webhook_runner = None
-    if os.getenv("YOOKASSA_WEBHOOK_ENABLED", "").lower() in ("1", "true", "yes"):
-        webhook_runner = await start_webhook_server(bot)
-
     try:
         log.info("🌿 ВашСад Бот запущен (PostgreSQL + Redis + Mini App + Scheduler)!")
         await dp.start_polling(bot, skip_updates=True)
     finally:
         scheduler.shutdown(wait=False)
-        if webhook_runner:
-            await webhook_runner.cleanup()
         await close_db()
         await redis.aclose()
 

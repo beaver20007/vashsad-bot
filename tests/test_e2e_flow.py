@@ -27,14 +27,12 @@ def _make_user_dataclass(**kwargs):
         username: str | None = "testuser"
         first_name: str | None = "Test"
         region: str | None = None
-        is_subscribed: bool = False
         chat_count: int = 0
         photo_count: int = 0
         plants_count: int = 0
         plot_size: float | None = None
         chat_history: list = field(default_factory=list)
         created_at: datetime = field(default_factory=datetime.now)
-        subscription_expires_at: datetime | None = None
         referral_code: str | None = None
         referred_by: int | None = None
         bonus_messages: int = 0
@@ -276,8 +274,8 @@ class TestBotFlow:
     @pytest.mark.asyncio
     async def test_chat_limit(self, limited_user):
         """
-        When a non-subscribed user has chat_count >= FREE_CHAT_LIMIT and no bonus
-        messages, the bot must send a subscription prompt instead of a Claude reply.
+        When a user has chat_count >= FREE_CHAT_LIMIT and no bonus messages,
+        the bot must send the limit-reached message instead of a Claude reply.
         """
         message = _make_message(text="Расскажи мне про газон")
 
@@ -285,7 +283,6 @@ class TestBotFlow:
             patch("handlers.chat.get_or_create_user", new_callable=AsyncMock, return_value=limited_user),
             patch("handlers.chat.can_use_chat", return_value=False),
             patch("handlers.chat.ask_claude", new_callable=AsyncMock) as mock_claude,
-            patch("handlers.chat.subscribe_keyboard", return_value=MagicMock()),
         ):
             from handlers.chat import handle_text_message
             await handle_text_message(message)
@@ -293,12 +290,11 @@ class TestBotFlow:
         # Claude must NOT be called
         mock_claude.assert_not_called()
 
-        # A subscription prompt must be sent
+        # The limit-reached message must be sent, with no subscription offer
         message.answer.assert_called_once()
         prompt_text = message.answer.call_args[0][0]
-        assert "Лимит" in prompt_text or "лимит" in prompt_text or "подписк" in prompt_text.lower(), (
-            "Expected subscription prompt when limit is reached"
-        )
+        assert "лимит" in prompt_text.lower(), "Expected limit-reached message"
+        assert "подписк" not in prompt_text.lower()
 
     # ------------------------------------------------------------------ #
     # 4. Referral code generation                                          #
@@ -508,15 +504,15 @@ class TestCanUseChat:
 
     def test_free_user_within_limit(self):
         from services.database import can_use_chat
-        user = _make_user_dataclass(chat_count=5, is_subscribed=False)
+        user = _make_user_dataclass(chat_count=5)
         assert can_use_chat(user, limit=10) is True
 
     def test_free_user_at_limit(self):
         from services.database import can_use_chat
-        user = _make_user_dataclass(chat_count=10, is_subscribed=False)
+        user = _make_user_dataclass(chat_count=10)
         assert can_use_chat(user, limit=10) is False
 
-    def test_subscribed_user_ignores_limit(self):
+    def test_bonus_messages_extend_limit(self):
         from services.database import can_use_chat
-        user = _make_user_dataclass(chat_count=999, is_subscribed=True)
+        user = _make_user_dataclass(chat_count=10, bonus_messages=3)
         assert can_use_chat(user, limit=10) is True

@@ -35,7 +35,7 @@ COMMANDS = [
     {"command": "nurseries",   "description": "🏡 Питомники в вашем регионе"},
     # --- Заказы и оплата ---
     {"command": "order",       "description": "📋 Заказать услугу дизайнера"},
-    {"command": "price",       "description": "💰 Прайс и подписка «Сад Про»"},
+    {"command": "price",       "description": "💰 Прайс-лист услуг"},
     {"command": "referral",    "description": "🎁 Реферальная программа"},
     {"command": "promo",       "description": "🏷 Применить промокод"},
     {"command": "callback",    "description": "📞 Запросить обратный звонок"},
@@ -115,8 +115,6 @@ async def set_webhook() -> None:
         "callback_query",
         "inline_query",
         "poll_answer",
-        "pre_checkout_query",
-        "successful_payment",
     ]
 
     print("=== Настройка Telegram Webhook ===\n")

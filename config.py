@@ -23,18 +23,10 @@ FREE_CHAT_LIMIT = int(os.getenv("FREE_CHAT_LIMIT", "10"))
 FREE_PHOTO_LIMIT = int(os.getenv("FREE_PHOTO_LIMIT", "3"))
 FREE_PLANTS_LIMIT = int(os.getenv("FREE_PLANTS_LIMIT", "3"))
 
-# ── Подписка ────────────────────────────────
-SUBSCRIPTION_PRICE = int(os.getenv("SUBSCRIPTION_PRICE", "299"))
-
 # ── Дизайнер ────────────────────────────────
 DESIGNER_NAME = os.getenv("DESIGNER_NAME", "Ваш дизайнер")
 DESIGNER_NAME_GEN = os.getenv("DESIGNER_NAME_GEN", "Анны Аркадьевой")
 BOT_NAME = "ВашСад Бот"
-
-# ── YooKassa ────────────────────────────────
-YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID", "")
-YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY", "")
-YOOKASSA_RETURN_URL = os.getenv("YOOKASSA_RETURN_URL", "https://t.me/vashsad_bot")
 
 # ── Бот ─────────────────────────────────────
 BOT_USERNAME = os.getenv("BOT_USERNAME", "washsad_ai_bot")

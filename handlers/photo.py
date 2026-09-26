@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, PhotoSize
 
 from config import FREE_PHOTO_LIMIT
-from keyboards import back_to_menu_keyboard, cancel_keyboard, subscribe_keyboard
+from keyboards import back_to_menu_keyboard, cancel_keyboard
 from services.ai import ask_claude_with_image
 from services.database import (
     can_use_photo,
@@ -15,6 +15,10 @@ from services.database import (
 )
 
 router = Router()
+
+# TODO(владелец/Аня): формулировка заглушка — подписки «Сад Про» больше нет
+# (решение владельца 26.09.2026), что предлагать при исчерпании лимита — не решено.
+PHOTO_LIMIT_TEXT = "⚠️ Лимит бесплатных фото-диагностик исчерпан."
 
 PHOTO_PROMPT_TEXT = (
     "📸 <b>Фото-диагностика растений</b>\n\n"
@@ -50,13 +54,7 @@ async def cmd_history(message: Message):
 async def cmd_photo(message: Message):
     user = await get_or_create_user(message.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
-        await message.answer(
-            f"⚠️ Лимит бесплатных фото-диагностик исчерпан "
-            f"({FREE_PHOTO_LIMIT}/мес).\n\n"
-            f"Оформите подписку <b>«Сад Про»</b> — безлимитная диагностика!",
-            parse_mode="HTML",
-            reply_markup=subscribe_keyboard(),
-        )
+        await message.answer(PHOTO_LIMIT_TEXT, reply_markup=back_to_menu_keyboard())
         return
     await message.answer(PHOTO_PROMPT_TEXT, parse_mode="HTML")
 
@@ -65,12 +63,7 @@ async def cmd_photo(message: Message):
 async def cb_photo(callback: CallbackQuery):
     user = await get_or_create_user(callback.from_user.id)
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
-        await callback.message.edit_text(
-            "⚠️ Лимит бесплатных фото-диагностик исчерпан.\n\n"
-            "Оформите подписку <b>«Сад Про»</b>!",
-            parse_mode="HTML",
-            reply_markup=subscribe_keyboard(),
-        )
+        await callback.message.edit_text(PHOTO_LIMIT_TEXT, reply_markup=back_to_menu_keyboard())
         await callback.answer()
         return
     await callback.message.edit_text(
@@ -88,12 +81,7 @@ async def handle_photo(message: Message):
     )
 
     if not can_use_photo(user, FREE_PHOTO_LIMIT):
-        await message.answer(
-            f"⚠️ Лимит бесплатных фото-диагностик исчерпан ({FREE_PHOTO_LIMIT}/мес).\n\n"
-            f"Оформите подписку <b>«Сад Про»</b>!",
-            parse_mode="HTML",
-            reply_markup=subscribe_keyboard(),
-        )
+        await message.answer(PHOTO_LIMIT_TEXT, reply_markup=back_to_menu_keyboard())
         return
 
     processing_msg = await message.answer(
@@ -123,13 +111,10 @@ async def handle_photo(message: Message):
     )
 
     # Обновляем счётчик
-    if not user.is_subscribed:
-        user.photo_count += 1
-        remaining = FREE_PHOTO_LIMIT - user.photo_count
-        await update_user(user)
-        footer = f"\n\n<i>Осталось бесплатных диагностик: {remaining}/{FREE_PHOTO_LIMIT}</i>"
-    else:
-        footer = ""
+    user.photo_count += 1
+    remaining = FREE_PHOTO_LIMIT - user.photo_count
+    await update_user(user)
+    footer = f"\n\n<i>Осталось бесплатных диагностик: {remaining}/{FREE_PHOTO_LIMIT}</i>"
 
     await processing_msg.delete()
 

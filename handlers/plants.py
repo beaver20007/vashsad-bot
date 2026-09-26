@@ -7,10 +7,10 @@ from aiogram.types import CallbackQuery, Message
 
 from config import FREE_PLANTS_LIMIT
 from keyboards import (
+    back_to_menu_keyboard,
     plan_result_keyboard,
     plants_region_keyboard,
     plants_type_keyboard,
-    subscribe_keyboard,
 )
 from services.ai import select_plants
 from services.database import can_use_plants, get_or_create_user, update_user
@@ -57,11 +57,10 @@ async def _start_plants_flow(message: Message, state: FSMContext, edit: bool = F
     user = await get_or_create_user(message.chat.id)
 
     if not can_use_plants(user, FREE_PLANTS_LIMIT):
-        text = (
-            "⚠️ Лимит бесплатных запросов подбора исчерпан.\n\n"
-            "Оформите подписку <b>«Сад Про»</b> за безлимитный подбор!"
-        )
-        kb = subscribe_keyboard()
+        # TODO(владелец/Аня): формулировка заглушка — подписки «Сад Про» больше
+        # нет (решение владельца 26.09.2026), что предлагать — не решено.
+        text = "⚠️ Лимит бесплатных запросов подбора исчерпан."
+        kb = back_to_menu_keyboard()
         if edit:
             await message.edit_text(text, parse_mode="HTML", reply_markup=kb)
         else:
@@ -130,9 +129,8 @@ async def cb_light(callback: CallbackQuery, state: FSMContext):
 
     # Проверяем лимит и обновляем счётчик
     user = await get_or_create_user(callback.from_user.id)
-    if not user.is_subscribed:
-        user.plants_count += 1
-        await update_user(user)
+    user.plants_count += 1
+    await update_user(user)
 
     await callback.message.edit_text(
         "🔍 <b>Подбираю растения для вас...</b>\n\n"
@@ -146,10 +144,8 @@ async def cb_light(callback: CallbackQuery, state: FSMContext):
 
     result = await select_plants(data)
 
-    remaining_text = ""
-    if not user.is_subscribed:
-        remaining = FREE_PLANTS_LIMIT - user.plants_count
-        remaining_text = f"\n\n<i>Осталось бесплатных запросов: {remaining}/{FREE_PLANTS_LIMIT}</i>"
+    remaining = FREE_PLANTS_LIMIT - user.plants_count
+    remaining_text = f"\n\n<i>Осталось бесплатных запросов: {remaining}/{FREE_PLANTS_LIMIT}</i>"
 
     await callback.message.edit_text(
         f"🌱 <b>Подборка растений готова!</b>\n\n{result}{remaining_text}",

@@ -20,7 +20,7 @@ AI-помощник дипломированного ландшафтного д
 | Команда | Описание |
 |---------|----------|
 | `/start` | Приветствие, главное меню, кнопка открытия Mini App |
-| `/profile` | Лимиты использования, статус подписки |
+| `/profile` | Лимиты использования |
 | `/plants` | Подбор растений (FSM-диалог) |
 | `/order` | Заказ услуг / бриф проекта (FSM-диалог) |
 | `/booking` | Запись на консультацию |
@@ -42,11 +42,9 @@ AI-помощник дипломированного ландшафтного д
 | Карта участка | `/garden-map` | Интерактивная карта зон |
 | Питомники | `/nurseries` | Ближайшие питомники на карте |
 | История заказов | `/orders` | Статусы заявок и проектов |
-| Профиль | `/profile` | Подписка, лимиты, настройки |
+| Профиль | `/profile` | Лимиты, настройки |
 
 ### Платежи
-- **YooKassa** — банковские карты, СБП (подписка, оплата услуг)
-- **Telegram Stars** — нативная оплата внутри Telegram
 - Промокоды со скидками
 - Реферальная программа
 
@@ -67,7 +65,6 @@ AI-помощник дипломированного ландшафтного д
 | База данных | PostgreSQL (Neon) — asyncpg |
 | FSM / кеш | Redis (Upstash или self-hosted) |
 | Планировщик | APScheduler |
-| Платежи | YooKassa, Telegram Stars |
 | PDF | WeasyPrint / ReportLab |
 | Email | Resend |
 | SMS | smsc.ru |
@@ -93,8 +90,8 @@ AI-помощник дипломированного ландшафтного д
         ┌───────────┼──────────────────┤                  │
         │           │                  │                  │
    ┌────▼────┐ ┌────▼────┐      ┌──────▼──────┐   ┌──────▼──────┐
-   │ Claude  │ │  Neon   │      │   Upstash   │   │  YooKassa   │
-   │   API   │ │Postgres │      │    Redis    │   │  / Stars    │
+   │ Claude  │ │  Neon   │      │   Upstash   │   │   Sentry    │
+   │   API   │ │Postgres │      │    Redis    │   │ (monitoring)│
    └─────────┘ └─────────┘      └─────────────┘   └─────────────┘
                     │
           ┌─────────┴─────────┐
@@ -167,11 +164,6 @@ python bot.py
 | `FREE_CHAT_LIMIT` | Нет | Лимит AI-сообщений на Free-тире (default: 10) |
 | `FREE_PHOTO_LIMIT` | Нет | Лимит фото-диагностик на Free-тире (default: 3) |
 | `FREE_PLANTS_LIMIT` | Нет | Лимит подборов растений на Free-тире (default: 3) |
-| `SUBSCRIPTION_PRICE` | Нет | Цена подписки в рублях (default: 299) |
-| `YOOKASSA_SHOP_ID` | Нет | ID магазина YooKassa |
-| `YOOKASSA_SECRET_KEY` | Нет | Секретный ключ YooKassa |
-| `YOOKASSA_RETURN_URL` | Нет | URL редиректа после оплаты |
-| `YOOKASSA_WEBHOOK_ENABLED` | Нет | Включить webhook-сервер (`1` после деплоя) |
 | `OPENWEATHER_API_KEY` | Нет | Ключ OpenWeatherMap (для виджета погоды в miniapp) |
 | `BOT_USERNAME` | Нет | Username бота без `@` (для ссылок) |
 | `ADMIN_TOKEN` | Нет | Секретный токен для дашборда `/admin` |
@@ -209,8 +201,6 @@ vashsad-full/
 │   ├── order.py              # Заказ услуг, бриф (FSM)
 │   ├── plan.py               # Генерация плана участка (FSM)
 │   ├── booking.py            # Запись на консультацию (FSM)
-│   ├── payment.py            # Оплата YooKassa
-│   ├── payment_stars.py      # Оплата Telegram Stars
 │   ├── referral.py           # Реферальная программа
 │   ├── promo.py              # Промокоды
 │   ├── onboarding.py         # Онбординг новых пользователей
@@ -226,14 +216,11 @@ vashsad-full/
 └── services/
     ├── ai.py                 # Claude API — чат + Vision
     ├── database.py           # PostgreSQL (asyncpg), init_db
-    ├── storage.py            # Legacy in-memory storage
     ├── notifications.py      # Уведомления дизайнеру
     ├── email_service.py      # Resend
     ├── sms_service.py        # smsc.ru
-    ├── payment_service.py    # YooKassa интеграция
     ├── pdf_generator.py      # Генерация PDF-отчётов
     ├── scheduler.py          # APScheduler (сезонные рассылки)
-    └── webhook_server.py     # aiohttp-сервер для YooKassa webhook
 ```
 
 ---
@@ -388,6 +375,5 @@ Rate limit: 60 запросов в 60 секунд на IP.
 - [Anthropic Console](https://console.anthropic.com) — управление API-ключами
 - [Neon](https://neon.tech) — serverless PostgreSQL
 - [Upstash](https://upstash.com) — serverless Redis
-- [YooKassa](https://yookassa.ru) — приём платежей в России
 - [Resend](https://resend.com) — транзакционные email
 - [smsc.ru](https://smsc.ru) — SMS-рассылки

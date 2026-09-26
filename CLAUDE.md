@@ -4,7 +4,7 @@
 ## Project Overview
 **Проект:** ВашСад Бот — Telegram-бот дипломированного ландшафтного дизайнера
 **Специализация:** Природный стиль садов, Нижегородская и Владимирская области
-**Стек:** Python 3.12 · aiogram 3.x · Claude API (Anthropic) · SQLite → PostgreSQL · YooKassa
+**Стек:** Python 3.12 · aiogram 3.x · Claude API (Anthropic) · SQLite → PostgreSQL
 **Репо:** ~/projects/vashsad
 **Документация:** ~/projects/vashsad/docs/
 
@@ -23,7 +23,7 @@ vashsad-full/
 │   ├── chat.py                   # AI-чат (текстовые сообщения)
 │   ├── plants.py                 # Подбор растений (FSM)
 │   ├── photo.py                  # Фото-диагностика (Claude Vision)
-│   ├── price.py                  # Прайс-лист, подписка
+│   ├── price.py                  # Прайс-лист
 │   ├── order.py                  # Заказ услуг, бриф проекта (FSM)
 │   ├── admin_bot_handlers.py     # Команды администратора (второй бот, не handlers/admin.py — тот убран)
 │   ├── booking.py                # Запись на консультацию (FSM)
@@ -33,8 +33,6 @@ vashsad-full/
 │   ├── inline_mode.py            # Inline-режим бота
 │   ├── moderation.py             # Модерация контента
 │   ├── onboarding.py             # Онбординг новых пользователей
-│   ├── payment.py                # Оплата (YooKassa)
-│   ├── payment_stars.py          # Оплата Telegram Stars
 │   ├── plan.py                   # FSM-диалог генерации плана участка
 │   ├── poll.py                   # Опросы пользователей
 │   ├── promo.py                  # Промокоды
@@ -42,15 +40,12 @@ vashsad-full/
 │   └── watering.py               # Напоминания о поливе
 └── services/
     ├── ai.py                     # Claude API — чат + Vision
-    ├── storage.py                # Хранилище пользователей (legacy)
     ├── database.py               # PostgreSQL (asyncpg)
     ├── notifications.py          # Уведомления дизайнеру (Telegram + Email + SMS)
     ├── email_service.py          # Email через Resend
     ├── sms_service.py            # SMS через smsc.ru
-    ├── payment_service.py        # YooKassa интеграция
     ├── pdf_generator.py          # Генерация PDF-отчётов
     ├── scheduler.py              # Планировщик задач (apscheduler)
-    └── webhook_server.py         # Webhook для YooKassa
 ```
 
 ## Standing Rules
@@ -80,9 +75,6 @@ DESIGNER_EMAIL=             # Email дизайнера для уведомлен
 SMSC_LOGIN=                 # smsc.ru логин
 SMSC_PASSWORD=              # smsc.ru пароль
 DESIGNER_PHONE=             # Телефон дизайнера для SMS
-YOOKASSA_SHOP_ID=           # YooKassa магазин
-YOOKASSA_SECRET_KEY=        # YooKassa секрет
-WEBHOOK_SECRET=             # Секрет для YooKassa webhook
 SENTRY_DSN=                 # Sentry для мониторинга ошибок
 REDIS_URL=                  # Redis (Upstash), rediss:// — FSM storage (bot.py), см. также кеш
 ```
@@ -95,10 +87,9 @@ REDIS_URL=                  # Redis (Upstash), rediss:// — FSM storage (bot.py
 - FSM-диалог генерации плана участка
 - Заказ услуг / бриф проекта (FSM)
 - Запись на консультацию (FSM)
-- Прайс-лист и управление подпиской
-- Оплата через YooKassa и Telegram Stars
+- Прайс-лист
 - Реферальная программа и промокоды
-- /profile — лимиты и статус подписки
+- /profile — лимиты
 - Welcome-картинка в /start
 - Онбординг новых пользователей
 - Inline-режим
@@ -108,7 +99,6 @@ REDIS_URL=                  # Redis (Upstash), rediss:// — FSM storage (bot.py
 - Панель администратора
 - Уведомления дизайнеру: Telegram + Email (Resend) + SMS (smsc.ru)
 - Генерация PDF-отчётов
-- Webhook для YooKassa
 - Miniapp: Garden / Diagnosis / Favorites, История заявок
 - Напоминания о поливе (handlers/watering.py)
 - Опросы пользователей (handlers/poll.py)
@@ -122,10 +112,9 @@ REDIS_URL=                  # Redis (Upstash), rediss:// — FSM storage (bot.py
 - [x] FSM-диалог генерации плана участка (handlers/plan.py)
 - [x] Уведомления дизайнеру: Telegram + Email (Resend) + SMS (smsc.ru)
 - [x] Welcome-картинка в /start (env: WELCOME_IMAGE_URL)
-- [x] /profile — лимиты и статус подписки
+- [x] /profile — лимиты
 - [x] Miniapp: Garden / Diagnosis / Favorites подключены к реальному API
 - [x] Miniapp: История заявок в разделе «Мой сад»
-- [x] Оплата Telegram Stars (handlers/payment_stars.py)
 - [x] Реферальная программа (handlers/referral.py)
 - [x] Промокоды (handlers/promo.py)
 - [x] Онбординг (handlers/onboarding.py)

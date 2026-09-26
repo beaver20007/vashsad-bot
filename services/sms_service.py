@@ -53,8 +53,3 @@ async def notify_sms_new_order(service_name: str, phone: str, client_name: str) 
 async def notify_sms_new_project(area: str, phone: str, client_name: str) -> bool:
     text = f"ВашСад: проект!\nУчасток {area}\n{client_name}\nТел: {phone}"
     return await send_sms(text)
-
-
-async def notify_sms_payment(service_name: str, amount: str) -> bool:
-    text = f"ВашСад: оплата!\n{service_name}\nСумма: {amount} руб."
-    return await send_sms(text)
