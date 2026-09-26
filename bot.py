@@ -29,6 +29,7 @@ from handlers.onboarding import router as onboarding_router
 from handlers.order import router as order_router
 from handlers.photo import router as photo_router
 from handlers.plan import router as plan_router
+from handlers.plan_exit import PlanExitMiddleware
 from handlers.plants import router as plants_router
 from handlers.poll import router as poll_router
 from handlers.price import router as price_router
@@ -92,6 +93,9 @@ async def main():
     dp = Dispatcher(storage=storage)
 
     # Порядок важен! FSM-роутеры ДО chat_router
+    # outer: срабатывает до фильтров состояний, иначе анкета PlanForm перехватит команду/кнопку
+    dp.message.outer_middleware(PlanExitMiddleware())
+    dp.callback_query.outer_middleware(PlanExitMiddleware())
     dp.message.middleware(BanCheckMiddleware())
     dp.callback_query.middleware(BanCheckMiddleware())
     dp.message.middleware(PdnConsentMiddleware())

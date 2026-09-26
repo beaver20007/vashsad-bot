@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
 from keyboards import cancel_keyboard, plan_result_keyboard
+from services import bot_texts
 from services.ai import ask_claude
 from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, save_order
@@ -66,7 +67,17 @@ async def cb_plan(callback: CallbackQuery, state: FSMContext):
     await _start_plan(callback.message, state, edit=True)
 
 
+async def _require_text(message: Message) -> bool:
+    """Шаги анкеты со свободным текстом: фото/голос/стикер не падают, просим ответить текстом, шаг не меняется."""
+    if message.text:
+        return True
+    await message.answer(bot_texts.get("plan")["text_only"], parse_mode="HTML")
+    return False
+
+
 async def _start_plan(message: Message, state: FSMContext, edit: bool = False):
+    # повторный вход после незавершённой анкеты не должен тащить старые area/style/budget/wishes
+    await state.clear()
     await state.set_state(PlanForm.waiting_area)
     text = (
         _progress(1) +
@@ -83,6 +94,8 @@ async def _start_plan(message: Message, state: FSMContext, edit: bool = False):
 # ── Шаг 1: площадь → шаг 2 (стиль) ────────────────────────────
 @router.message(PlanForm.waiting_area)
 async def plan_area(message: Message, state: FSMContext):
+    if not await _require_text(message):
+        return
     await state.update_data(area=message.text.strip())
 
     # Раньше здесь были 4 захардкоженных кнопки (природный/регулярный/
@@ -113,6 +126,8 @@ async def plan_area(message: Message, state: FSMContext):
 # ── Шаг 2: стиль → шаг 3 (бюджет) ──────────────────────────
 @router.message(PlanForm.waiting_style)
 async def plan_style(message: Message, state: FSMContext):
+    if not await _require_text(message):
+        return
     await state.update_data(style=message.text.strip())
 
     builder = InlineKeyboardBuilder()
@@ -151,6 +166,8 @@ async def plan_budget(callback: CallbackQuery, state: FSMContext):
 # ── Шаг 4: пожелания → шаг 5 (подтверждение) ───────────────
 @router.message(PlanForm.waiting_wishes)
 async def plan_wishes(message: Message, state: FSMContext):
+    if not await _require_text(message):
+        return
     await state.update_data(wishes=message.text.strip())
     data = await state.get_data()
 

@@ -105,6 +105,9 @@
         "error_generic": "❌ Something went wrong. Please try again or contact support."
       }
     },
+    "plan": {
+      "text_only": "✍️ Пожалуйста, ответьте текстом. Чтобы выйти из анкеты, нажмите «Отмена» или отправьте любую команду."
+    },
     "onboarding": {
       "region_prompt": "🌿 <b>Пара вопросов для персонализации</b>\n\n📍 <b>В каком регионе ваш сад?</b>",
       "area_prompt": "📍 Регион: <b>{region}</b>\n\n📐 <b>Площадь участка?</b>",
