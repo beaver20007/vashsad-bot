@@ -1,10 +1,12 @@
 """Хендлер /start — приветствие, главное меню + кнопка Mini App"""
+import logging
 import os
 from datetime import UTC, datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -28,6 +30,8 @@ from config import (
 )
 from services.database import get_or_create_user, insert_analytics_event, set_pdn_consent
 from services.i18n import t
+
+log = logging.getLogger(__name__)
 
 SCREEN_LINKS = {
     'screen_garden': ('🏡 Мой сад', 'garden'),
@@ -265,8 +269,8 @@ async def cb_pdn_consent_start(callback: CallbackQuery):
     await callback.answer("Спасибо! Согласие сохранено ✅")
     try:
         await callback.message.delete()
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning("pdn:consent_start: не удалось удалить сообщение согласия: %s", e)
     await _send_welcome(callback.message, callback.from_user.id, user)
 
 
@@ -408,8 +412,6 @@ async def quick_profile(message: Message):
 
 # ── /callback — запрос обратного звонка ──────────────────────────────────────
 
-from aiogram.fsm.state import State, StatesGroup
-
 
 class CallbackForm(StatesGroup):
     waiting_phone = State()
@@ -453,8 +455,8 @@ async def process_callback_phone(message: Message, state: FSMContext):
                     json={"chat_id": designer_id, "text": text},
                     timeout=aiohttp.ClientTimeout(total=10),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("callback-запрос: не удалось уведомить дизайнера: %s", e)
 
     await message.answer(
         "✅ <b>Запрос отправлен!</b>\n\n"

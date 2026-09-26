@@ -36,7 +36,7 @@ async def send_monthly_poll(bot):
     sent = 0
     for row in users:
         try:
-            msg = await bot.send_poll(
+            await bot.send_poll(
                 row['telegram_id'],
                 question="🌿 Какое растение стало вашим открытием этого месяца?",
                 options=options,
@@ -46,8 +46,8 @@ async def send_monthly_poll(bot):
             sent += 1
             if sent >= 3:  # Limit for testing; remove in prod
                 break
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Monthly poll: не отправлено %s: %s", row['telegram_id'], e)
     log.info(f"Monthly poll sent to {sent} users")
 
 @router.message(Command("send_poll"))

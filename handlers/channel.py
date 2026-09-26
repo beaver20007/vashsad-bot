@@ -65,7 +65,7 @@ async def cb_check_subscription(callback: CallbackQuery):
 
     if subscribed:
         # Проверяем, не начислялся ли бонус уже (через БД)
-        user = await get_or_create_user(
+        await get_or_create_user(
             user_id,
             username=callback.from_user.username,
             first_name=callback.from_user.first_name,

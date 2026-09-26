@@ -39,23 +39,22 @@ async def send_email(subject: str, body: str) -> bool:
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {RESEND_API_KEY}",
-                    "Content-Type":  "application/json",
-                },
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
-                data = await resp.json()
-                if resp.status == 200 or resp.status == 201:
-                    log.info(f"Email отправлен, id={data.get('id')}")
-                    return True
-                else:
-                    log.error(f"Resend ошибка {resp.status}: {data}")
-                    return False
+        async with aiohttp.ClientSession() as session, session.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type":  "application/json",
+            },
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            data = await resp.json()
+            if resp.status == 200 or resp.status == 201:
+                log.info(f"Email отправлен, id={data.get('id')}")
+                return True
+            else:
+                log.error(f"Resend ошибка {resp.status}: {data}")
+                return False
 
     except Exception as e:
         log.error(f"Email exception: {e}")

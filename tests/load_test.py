@@ -12,14 +12,14 @@ ENDPOINTS = [
     ('GET', '/api/weather', {}),
 ]
 
-async def single_request(session, method, path, headers={}):
+async def single_request(session, method, path, headers=None):
     url = BASE_URL + path
     start = time.monotonic()
     try:
         async with session.request(method, url, headers=headers) as resp:
             await resp.read()
             return time.monotonic() - start, resp.status
-    except Exception as e:
+    except Exception:
         return time.monotonic() - start, 0
 
 async def run_load_test(concurrency=10, total_requests=100):

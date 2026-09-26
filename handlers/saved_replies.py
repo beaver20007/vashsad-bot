@@ -15,7 +15,7 @@ import os
 
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from services.database import get_pool
 
@@ -198,8 +198,6 @@ async def cmd_delete_reply(message: Message) -> None:
 
 
 # ── Callback: кнопка «отправить шаблон» из /replies ─────────────────────────
-
-from aiogram.types import CallbackQuery
 
 
 @router.callback_query(lambda c: c.data and c.data.startswith("sr_send:"))

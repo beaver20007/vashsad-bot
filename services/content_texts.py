@@ -33,7 +33,7 @@ async def get_value(namespace: str, key: str) -> dict | None:
                 "SELECT value FROM content_strings WHERE namespace=$1 AND key=$2", namespace, key,
             )
     except Exception as e:
-        log.debug("content_strings недоступна для (%r, %r) (%s) — используем значение по умолчанию", namespace, key, e)
+        log.warning("content_strings недоступна для (%r, %r): %s — используем значение по умолчанию", namespace, key, e)
         return None
     if not row:
         return None

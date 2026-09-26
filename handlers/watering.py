@@ -40,7 +40,7 @@ async def watering_plants(message: Message, state: FSMContext):
 @router.message(WateringForm.waiting_time)
 async def watering_time(message: Message, state: FSMContext):
     try:
-        t = datetime.strptime(message.text.strip(), "%H:%M").time()
+        datetime.strptime(message.text.strip(), "%H:%M")
     except ValueError:
         await message.answer("Неверный формат. Введите время как ЧЧ:ММ, например 08:30")
         return

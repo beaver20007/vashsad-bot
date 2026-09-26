@@ -3,6 +3,7 @@ services/scheduler.py
 Сезонные рассылки через APScheduler.
 """
 import logging
+from datetime import datetime, timedelta
 
 import aiohttp
 from aiogram import Bot
@@ -86,9 +87,8 @@ async def notify_garden_tasks(bot: Bot) -> None:
     log.info("Уведомления о задачах: отправлено %d, ошибок %d", sent, failed)
 
 
-async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int, slot_dt: "datetime") -> None:
+async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int, slot_dt: datetime) -> None:
     """Планирует напоминания за 24ч и 1ч до консультации."""
-    from datetime import datetime, timedelta
     remind_24h = slot_dt - timedelta(hours=24)
     remind_1h  = slot_dt - timedelta(hours=1)
     now = datetime.now()
@@ -112,7 +112,7 @@ async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int
     log.info("Напоминания о записи #%s запланированы", booking_id)
 
 
-async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: "datetime", kind: str) -> None:
+async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: datetime, kind: str) -> None:
     from aiogram.exceptions import TelegramForbiddenError
     label = "24 часа" if kind == "24h" else "1 час"
     text = (
@@ -131,7 +131,6 @@ async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: "datetime"
 
 async def schedule_nps(bot: Bot, telegram_id: int, order_id: int) -> None:
     """Планирует NPS-опрос через 3 дня после выполнения заявки."""
-    from datetime import datetime, timedelta
 
 
     # Используем глобальный шедулер из setup_scheduler
@@ -155,7 +154,6 @@ async def _send_nps_job(bot: Bot, telegram_id: int, order_id: int) -> None:
 async def schedule_watering_reminder(bot, telegram_id: int, plants: str, time_str: str, frequency: str):
     if not _scheduler_instance:
         return
-    from datetime import datetime
 
     from apscheduler.triggers.cron import CronTrigger
 
@@ -177,8 +175,8 @@ async def schedule_watering_reminder(bot, telegram_id: int, plants: str, time_st
                 f"💧 <b>Время полить {plants}!</b>\n\nНе забудьте полить ваши растения сегодня 🌱",
                 parse_mode="HTML"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Напоминание о поливе не отправлено %s: %s", telegram_id, e)
 
     _scheduler_instance.add_job(send_reminder, trigger, id=job_id, replace_existing=True)
 
@@ -288,7 +286,6 @@ MONTHLY_SEASONAL = {
 
 def get_newsletter_content() -> dict:
     """Возвращает контент рассылки на основе текущего месяца."""
-    from datetime import datetime
     month = datetime.now().month
     return {
         "tips": (
@@ -329,7 +326,8 @@ async def send_newsletter_blast(bot: Bot) -> None:
         if isinstance(topics, str):
             try:
                 topics = _json.loads(topics)
-            except Exception:
+            except Exception as e:
+                log.warning("send_newsletter_blast: битый topics у %s (%s) - пропуск", telegram_id, e)
                 topics = []
         if not topics:
             continue
@@ -347,28 +345,30 @@ async def send_newsletter_blast(bot: Bot) -> None:
     log.info("Рассылка newsletter_blast завершена: отправлено %d, ошибок %d", total_sent, total_failed)
 
 
+async def _alert_designers(bot: Bot, designer_ids: list, text: str) -> None:
+    for designer_id in designer_ids:
+        try:
+            await bot.send_message(designer_id, text)
+        except Exception as e:
+            log.warning("self_ping_check: не удалось уведомить дизайнера %s: %s", designer_id, e)
+
+
 async def self_ping_check(bot: Bot) -> None:
     """Каждые 10 минут проверяет health-check miniapp и уведомляет дизайнеров при сбое."""
     designer_ids = [d for d in (DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2) if d]
     try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(
-                f'{MINI_APP_URL}/api/health',
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as r:
-                if r.status != 200:
-                    for designer_id in designer_ids:
-                        try:
-                            await bot.send_message(designer_id, f"⚠️ Health check failed! HTTP {r.status}")
-                        except Exception:
-                            pass
-    except Exception:
-        for designer_id in designer_ids:
-            try:
-                await bot.send_message(designer_id, "⚠️ Miniapp не отвечает!")
-            except Exception:
-                pass
-
+        async with aiohttp.ClientSession() as s, s.get(
+            f'{MINI_APP_URL}/api/health',
+            timeout=aiohttp.ClientTimeout(total=10)
+        ) as r:
+            status = r.status
+    except Exception as e:
+        log.warning("self_ping_check: miniapp не отвечает: %s", e)
+        await _alert_designers(bot, designer_ids, "⚠️ Miniapp не отвечает!")
+        return
+    if status != 200:
+        log.warning("self_ping_check: health check HTTP %s", status)
+        await _alert_designers(bot, designer_ids, f"⚠️ Health check failed! HTTP {status}")
 
 _scheduler_instance: AsyncIOScheduler | None = None
 

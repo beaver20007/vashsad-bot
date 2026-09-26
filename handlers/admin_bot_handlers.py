@@ -585,7 +585,8 @@ async def cb_broadcast_confirm(callback: CallbackQuery, main_bot: Bot):
             # main_bot: рассылка клиентам, не с этим админ-ботом.
             await main_bot.send_message(row["telegram_id"], text, parse_mode="HTML")
             sent += 1
-        except Exception:
+        except Exception as e:
+            log.warning("Рассылка: не доставлено %s: %s", row["telegram_id"], e)
             failed += 1
 
     await callback.message.edit_text(
@@ -758,7 +759,8 @@ async def receive_segment_text(message: Message, main_bot: Bot):
             # main_bot: рассылка клиентам, не с этим админ-ботом.
             await main_bot.send_message(row['telegram_id'], text, parse_mode="HTML")
             sent += 1
-        except Exception:
+        except Exception as e:
+            log.warning("Рассылка по сегменту: не доставлено %s: %s", row['telegram_id'], e)
             failed += 1
 
     await message.answer(f"✅ Готово! Отправлено: {sent}, ошибок: {failed}")

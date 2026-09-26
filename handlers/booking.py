@@ -152,7 +152,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     slot_dt   = data["slot_dt"]
     svc_key   = data["service_key"]
     svc_price = data["service_price"]
-    svc_name  = next((l for l, k, _ in BOOKING_SERVICES if k == svc_key), svc_key)
+    svc_name  = next((label for label, k, _ in BOOKING_SERVICES if k == svc_key), svc_key)
 
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -287,8 +287,8 @@ async def cb_add_week_slots(callback: CallbackQuery):
                         slot_dt,
                     )
                     added += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.warning("Слот %s не добавлен: %s", slot_dt, e)
     await callback.answer(f"Добавлено {added} слотов", show_alert=True)
 
 

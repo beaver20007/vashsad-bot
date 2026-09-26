@@ -25,10 +25,7 @@ def generate_ics(
         Байты ICS-файла.
     """
     # Нормализуем к UTC
-    if start_dt.tzinfo is None:
-        start_utc = start_dt.replace(tzinfo=UTC)
-    else:
-        start_utc = start_dt.astimezone(UTC)
+    start_utc = start_dt.replace(tzinfo=UTC) if start_dt.tzinfo is None else start_dt.astimezone(UTC)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 
@@ -79,10 +76,7 @@ def build_google_calendar_url(
     Returns:
         URL для Google Calendar.
     """
-    if start_dt.tzinfo is None:
-        start_utc = start_dt.replace(tzinfo=UTC)
-    else:
-        start_utc = start_dt.astimezone(UTC)
+    start_utc = start_dt.replace(tzinfo=UTC) if start_dt.tzinfo is None else start_dt.astimezone(UTC)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 

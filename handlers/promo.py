@@ -141,7 +141,8 @@ async def cmd_new_promo(message: Message):
                 "INSERT INTO promo_codes (code, discount_pct, uses_left) VALUES ($1,$2,$3)",
                 code, discount, uses,
             )
-        except Exception:
+        except Exception as e:
+            log.warning("newpromo: не удалось вставить код %s: %s", code, e)
             await message.answer(f"❌ Код <code>{code}</code> уже существует.", parse_mode="HTML")
             return
 

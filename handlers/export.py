@@ -53,7 +53,7 @@ async def cb_export(callback: CallbackQuery):
 
     key = callback.data.split(":")[1]
     days = next((d for _, d, k in PERIODS if k == key), 30)
-    label = next((l for l, _, k in PERIODS if k == key), "период")
+    label = next((lbl for lbl, _, k in PERIODS if k == key), "период")
 
     await callback.answer("Генерирую PDF…")
 
@@ -218,7 +218,6 @@ def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_L
                             topMargin=2*cm, bottomMargin=2.5*cm)
 
     SAGE  = colors.HexColor("#4A6B50")
-    CREAM = colors.HexColor("#F9F7F3")
     EARTH = colors.HexColor("#8B6F47")
 
     styles = getSampleStyleSheet()
@@ -286,7 +285,6 @@ def _build_pdf(rows, period_label: str) -> bytes:
 
     SAGE  = colors.HexColor("#4A6B50")
     CREAM = colors.HexColor("#F9F7F3")
-    EARTH = colors.HexColor("#8B6F47")
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("title", parent=styles["Normal"],
