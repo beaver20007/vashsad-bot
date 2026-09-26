@@ -18,27 +18,26 @@ async def send_sms(text: str) -> bool:
         return False
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://smsc.ru/sys/send.php",
-                params={
-                    "login":   SMS_LOGIN,
-                    "psw":     SMS_PASSWORD,
-                    "phones":  SMS_PHONE,
-                    "mes":     text,
-                    "charset": "utf-8",
-                    # fmt=1 убрали — берём текстовый ответ
-                },
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                result = await resp.text()
-                log.info(f"smsc.ru ответ: {result}")
-                # Успех если нет слова ERROR
-                if "ERROR" in result.upper():
-                    log.error(f"SMS ошибка: {result}")
-                    return False
-                log.info(f"SMS отправлен на {SMS_PHONE}")
-                return True
+        async with aiohttp.ClientSession() as session, session.get(
+            "https://smsc.ru/sys/send.php",
+            params={
+                "login":   SMS_LOGIN,
+                "psw":     SMS_PASSWORD,
+                "phones":  SMS_PHONE,
+                "mes":     text,
+                "charset": "utf-8",
+                # fmt=1 убрали — берём текстовый ответ
+            },
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            result = await resp.text()
+            log.info(f"smsc.ru ответ: {result}")
+            # Успех если нет слова ERROR
+            if "ERROR" in result.upper():
+                log.error(f"SMS ошибка: {result}")
+                return False
+            log.info(f"SMS отправлен на {SMS_PHONE}")
+            return True
 
     except Exception as e:
         log.error(f"SMS exception: {e}")

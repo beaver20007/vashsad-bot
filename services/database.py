@@ -4,6 +4,7 @@ services/database.py
 Полностью совместим с существующим кодом — drop-in замена storage.py
 """
 import asyncio
+import json as _json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -519,7 +520,8 @@ async def search_plants(query: str = "", category: str = "", limit: int = 20) ->
                     limit,
                 )
             return [dict(r) for r in rows]
-        except Exception:
+        except Exception as e:
+            log.error("get_plants: ошибка запроса, отдаю пустой список: %s", e)
             return []
 
 
@@ -796,8 +798,6 @@ async def get_users_with_tasks_due_today() -> list:
 # ══════════════════════════════════════════════════════════════
 #  ANALYTICS EVENTS — A/B тест и конверсии
 # ══════════════════════════════════════════════════════════════
-
-import json as _json
 
 
 async def insert_analytics_event(

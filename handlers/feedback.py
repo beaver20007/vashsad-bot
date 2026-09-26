@@ -74,8 +74,8 @@ async def cb_nps(callback: CallbackQuery):
                     f"Пользователь: @{callback.from_user.username or callback.from_user.id}",
                     parse_mode="HTML",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("NPS: не удалось уведомить дизайнера %s о низкой оценке: %s", designer_id, e)
 
     await callback.answer()
 

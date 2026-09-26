@@ -95,17 +95,16 @@ async def check_telegram():
         return False
     try:
         import aiohttp
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.telegram.org/bot{token}/getMe") as r:
-                data = await r.json()
-                if data.get("ok"):
-                    bot = data["result"]
-                    ok(f"Bot: @{bot['username']} ({bot['first_name']})")
-                    return True
-                else:
-                    fail(f"Bot token invalid: {data.get('description')}")
-                    errors.append("TELEGRAM_BOT_TOKEN")
-                    return False
+        async with aiohttp.ClientSession() as session, session.get(f"https://api.telegram.org/bot{token}/getMe") as r:
+            data = await r.json()
+            if data.get("ok"):
+                bot = data["result"]
+                ok(f"Bot: @{bot['username']} ({bot['first_name']})")
+                return True
+            else:
+                fail(f"Bot token invalid: {data.get('description')}")
+                errors.append("TELEGRAM_BOT_TOKEN")
+                return False
     except Exception as e:
         fail(f"Telegram check failed: {e}")
         return False

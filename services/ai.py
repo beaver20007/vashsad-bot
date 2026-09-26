@@ -31,20 +31,19 @@ async def ask_claude(messages: list, system: str = None) -> str:
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status != 200:
-                    err = await resp.text()
-                    log.error(f"Claude API error {resp.status}: {err}")
-                    return "❌ Ошибка AI. Попробуйте позже или нажмите «Заказать проект» для связи с дизайнером."
+        async with aiohttp.ClientSession() as session, session.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status != 200:
+                err = await resp.text()
+                log.error(f"Claude API error {resp.status}: {err}")
+                return "❌ Ошибка AI. Попробуйте позже или нажмите «Заказать проект» для связи с дизайнером."
 
-                data = await resp.json()
-                return data["content"][0]["text"]
+            data = await resp.json()
+            return data["content"][0]["text"]
 
     except aiohttp.ClientTimeout:
         return "⏳ Запрос занял слишком много времени. Попробуйте ещё раз."
@@ -97,20 +96,19 @@ async def ask_claude_with_image(image_bytes: bytes, mime_type: str, question: st
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=45),
-            ) as resp:
-                if resp.status != 200:
-                    err = await resp.text()
-                    log.error(f"Claude Vision error {resp.status}: {err}")
-                    return "❌ Не удалось проанализировать фото. Попробуйте ещё раз."
+        async with aiohttp.ClientSession() as session, session.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=45),
+        ) as resp:
+            if resp.status != 200:
+                err = await resp.text()
+                log.error(f"Claude Vision error {resp.status}: {err}")
+                return "❌ Не удалось проанализировать фото. Попробуйте ещё раз."
 
-                data = await resp.json()
-                return data["content"][0]["text"]
+            data = await resp.json()
+            return data["content"][0]["text"]
 
     except Exception as e:
         log.error(f"Claude Vision exception: {e}")

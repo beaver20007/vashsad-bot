@@ -240,16 +240,6 @@ def generate_guide_pdf(
 
         for (name, latin, _, light, water, zone, desc) in plants_in_cat:
             # Карточка растения как таблица
-            header_row = [
-                [Paragraph(name, plant_name_style),
-                 Paragraph(latin, plant_latin_style)],
-            ]
-            props_row = [[
-                Paragraph(f"☀ {light}  💧 {water}  ❄ {zone}", body_style),
-                "",
-            ]]
-            desc_row = [[Paragraph(desc, body_style), ""]]
-
             tdata = [
                 [Paragraph(name, plant_name_style), Paragraph(latin, plant_latin_style)],
                 [Paragraph(f"☀ {light}  💧 {water}  ❄ {zone}", body_style), ""],
