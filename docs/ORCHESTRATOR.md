@@ -2498,3 +2498,9 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 ### 2026-09-26 - решения владельца
 - max-integration/ на main: оставлено по решению владельца 26.09.2026, не трогать до возобновления MAX-переноса (Ф26).
 - budget_range: колонка в схеме и save_order не трогаются; в CSV-экспорте подпись исправлена на реальное содержимое (service_price), PR fix/csv-budget-label.
+
+### 2026-09-26 - seed bot_text применён в прод
+- До: content_strings = {designer_bio:1, order_status:5}, bot_text = 0 (бэкап всех 6 строк снят локально до записи). --apply: вставлено 6 ключей (faq, i18n, onboarding, seasonal_messages, system_prompt.chat, system_prompt.vision), существующие строки не тронуты. После: {bot_text:6, designer_bio:1, order_status:5}.
+- Откат: DELETE FROM content_strings WHERE namespace='bot_text' (строки были новыми, бот вернётся на файл-дефолт).
+- Бот подхватил строки refresh-задачей в 15:28:58 UTC (загружено 6), WARNING про fallback после этого нет. Живой /start и FAQ (география работы) OK.
+- НАЙДЕН БАГ (не связан с seed, не исправлен): handlers/start.py cb_cancel и /start не делают state.clear() - кнопка Отмена и /start не выходят из FSM (plan/watering/plants и др.), пока пользователь не дойдёт до конца; текст в это время съедается FSM-обработчиком, а не чатом/FAQ.
