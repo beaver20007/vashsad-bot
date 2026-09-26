@@ -179,6 +179,9 @@ def mini_app_keyboard() -> InlineKeyboardMarkup:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    # /start выходит из любой незавершённой анкеты (plan, plants, order...), иначе следующий текст
+    # уйдёт в FSM-обработчик вместо чата/FAQ
+    await state.clear()
     # Async: сохраняем пользователя в PostgreSQL
     user = await get_or_create_user(
         message.from_user.id,
@@ -313,7 +316,8 @@ async def cb_main_menu(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "cancel")
-async def cb_cancel(callback: CallbackQuery):
+async def cb_cancel(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await callback.message.edit_text(
         _welcome_text_for(callback.from_user.id),
         reply_markup=mini_app_keyboard(),
