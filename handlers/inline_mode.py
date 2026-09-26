@@ -1,4 +1,4 @@
-"""Фаза 4: Inline-режим — @vashsad_bot [вопрос] в любом чате"""
+"""Фаза 4: Inline-режим — @washsad_ai_bot [вопрос] в любом чате"""
 import logging
 
 from aiogram import Router

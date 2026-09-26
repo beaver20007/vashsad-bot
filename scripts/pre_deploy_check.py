@@ -26,7 +26,6 @@ OPTIONAL_ENV = [
     ("MINI_APP_URL", "Miniapp URL for deep links"),
     ("WELCOME_IMAGE_URL", "Welcome image URL"),
     ("DESIGNER_EMAIL", "Designer email for notifications"),
-    ("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID public key for push notifications"),
 ]
 
 REQUIRED_FILES = [

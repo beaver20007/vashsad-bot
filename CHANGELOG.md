@@ -24,7 +24,6 @@
 ### Miniapp Features Added
 - 22+ screens: plants, order, garden, diary, map, chat, profile, etc.
 - Real-time designer chat (polling 5s)
-- Push notifications (Web Push + VAPID)
 - PWA: Service Worker, offline page, install prompt
 - Infinite scroll for plant catalog
 - Plant search with highlight
