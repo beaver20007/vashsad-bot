@@ -30,10 +30,17 @@ def test_two_bots_same_user_get_different_keys():
     assert a != b
 
 
-def test_ttl_is_24_hours():
+def test_state_ttl_is_24_hours_and_data_ttl_has_a_margin():
     storage = bot_module.make_fsm_storage(MagicMock())
     assert storage.state_ttl == 86400
-    assert storage.data_ttl == 86400
+    assert storage.data_ttl == 86400 + 3600 == 90000
+
+
+def test_data_ttl_always_outlives_state_ttl():
+    """state не должен пережить data: иначе data["slot_id"] и др. дадут KeyError у пользователя, сидящего в форме."""
+    storage = bot_module.make_fsm_storage(MagicMock())
+    assert storage.data_ttl > storage.state_ttl
+    assert storage.data_ttl - storage.state_ttl == bot_module.FSM_DATA_TTL_MARGIN_SECONDS
 
 
 @pytest.mark.asyncio
@@ -47,6 +54,8 @@ async def test_ttl_and_prefixed_key_reach_redis_calls():
 
     calls = redis.set.await_args_list
     assert len(calls) == 2
+    by_part = {call.args[0].rsplit(":", 1)[-1]: call for call in calls}
     for call in calls:
         assert call.args[0].startswith(bot_module.FSM_KEY_PREFIX + ":")
-        assert call.kwargs["ex"] == 86400
+    assert by_part["state"].kwargs["ex"] == 86400
+    assert by_part["data"].kwargs["ex"] == 90000
