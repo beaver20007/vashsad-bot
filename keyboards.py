@@ -18,9 +18,6 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💰 Прайс-лист", callback_data="menu:price"),
         InlineKeyboardButton(text="📞 Заказать проект", callback_data="menu:order"),
     )
-    builder.row(
-        InlineKeyboardButton(text="⭐ Подписка Сад Про", callback_data="menu:subscribe"),
-    )
     return builder.as_markup()
 
 
@@ -34,14 +31,9 @@ def price_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🏡 Рассчитать стоимость проекта", callback_data="order:project"),
     )
     builder.row(
-        InlineKeyboardButton(text="⭐ Оформить подписку", callback_data="menu:subscribe"),
-    )
-    builder.row(
         InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main"),
     )
     return builder.as_markup()
-
-
 
 
 def order_confirm_keyboard(service_key: str) -> InlineKeyboardMarkup:
@@ -110,17 +102,3 @@ def plants_type_keyboard() -> InlineKeyboardMarkup:
     builder.row(InlineKeyboardButton(text="◀️ Отмена", callback_data="cancel"))
     return builder.as_markup()
 
-
-def subscribe_keyboard() -> InlineKeyboardMarkup:
-    """Кнопки подписки"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="💳 1 месяц — 299 ₽", callback_data="sub:month"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="🎁 12 месяцев — 2 490 ₽ (−30%)", callback_data="sub:year"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main"),
-    )
-    return builder.as_markup()

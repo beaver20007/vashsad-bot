@@ -20,23 +20,6 @@ services:
       timeout: 10s
       retries: 3
 
-  webhook:
-    build: .
-    command: python -m services.webhook_server
-    restart: always
-    env_file: .env
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - vashsad-net
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   admin_bot:
     build: .
     command: python admin_bot.py

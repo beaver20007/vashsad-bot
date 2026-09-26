@@ -193,11 +193,11 @@ class TestReferralCode:
 
 
 # ---------------------------------------------------------------------------
-# 3. Price constants — config.py :: SUBSCRIPTION_PRICE
+# 3. Free-tier limits — config.py
 # ---------------------------------------------------------------------------
 
 class TestPriceConstants:
-    """Tests for price-related constants in config.py."""
+    """Tests for free-tier limit constants in config.py."""
 
     @pytest.fixture(autouse=True)
     def _import(self):
@@ -206,12 +206,6 @@ class TestPriceConstants:
             self.config = config
         except ImportError as exc:
             pytest.skip(f"Could not import config: {exc}")
-
-    def test_subscription_price_is_positive(self):
-        assert self.config.SUBSCRIPTION_PRICE > 0
-
-    def test_subscription_price_is_int(self):
-        assert isinstance(self.config.SUBSCRIPTION_PRICE, int)
 
     def test_free_limits_are_positive(self):
         assert self.config.FREE_CHAT_LIMIT > 0

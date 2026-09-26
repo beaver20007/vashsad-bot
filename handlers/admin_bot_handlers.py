@@ -181,8 +181,7 @@ async def cmd_stats(message: Message):
         f"👥 <b>Пользователи:</b>\n"
         f"  Всего: {stats['total_users']}\n"
         f"  За 7 дней: +{stats['new_7d']}\n"
-        f"  За 30 дней: +{stats['new_30d']}\n"
-        f"  Подписчиков: {stats['subscribed']} ⭐\n\n"
+        f"  За 30 дней: +{stats['new_30d']}\n\n"
         f"📋 <b>Заявки:</b>\n"
         f"  Всего: {stats['total_orders']}\n"
         f"  За 7 дней: {stats['orders_7d']}\n\n"
@@ -673,8 +672,6 @@ async def cmd_broadcast_segment(message: Message):
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⭐ Только подписчики", callback_data="bseg:subscribed")],
-        [InlineKeyboardButton(text="🌟 Подписчики Stars", callback_data="bseg:stars_subscribers")],
         [InlineKeyboardButton(text="📋 Есть заявки", callback_data="bseg:with_orders")],
         *[
             [InlineKeyboardButton(text=f"📍 {value}", callback_data=f"bseg:{slug}")]
@@ -698,8 +695,6 @@ async def cb_segment_chosen(callback: CallbackQuery):
     _pending_segments[callback.from_user.id] = {'segment': segment, 'step': 'await_text'}
 
     segment_labels = {
-        'subscribed': 'подписчики',
-        'stars_subscribers': 'подписчики Stars (активная подписка)',
         'with_orders': 'пользователи с заявками',
         'new_7d': 'новые за 7 дней',
         'inactive_30d': 'неактивные 30 дней',
@@ -726,13 +721,7 @@ async def receive_segment_text(message: Message, main_bot: Bot):
 
     pool = await get_pool()
     async with pool.acquire() as conn:
-        if segment == 'subscribed':
-            users = await conn.fetch("SELECT telegram_id FROM users WHERE is_subscribed = TRUE AND (is_banned IS NOT TRUE)")
-        elif segment == 'stars_subscribers':
-            users = await conn.fetch(
-                "SELECT telegram_id FROM users WHERE subscription_expires_at > NOW() AND (is_banned IS NOT TRUE)"
-            )
-        elif segment == 'with_orders':
+        if segment == 'with_orders':
             users = await conn.fetch(
                 """SELECT DISTINCT u.telegram_id FROM users u
                    JOIN orders o ON o.telegram_id = u.telegram_id

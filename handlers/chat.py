@@ -3,8 +3,8 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from config import FREE_CHAT_LIMIT, SUBSCRIPTION_PRICE
-from keyboards import back_to_menu_keyboard, subscribe_keyboard
+from config import FREE_CHAT_LIMIT
+from keyboards import back_to_menu_keyboard
 from services.ai import SYSTEM_PROMPT, ask_claude
 from services.database import (
     add_bonus_messages,
@@ -97,12 +97,11 @@ def check_faq(text: str) -> str | None:
     return None
 
 
-LIMIT_REACHED_TEXT = (
-    f"⚠️ <b>Лимит бесплатных сообщений исчерпан</b>\n\n"
-    f"В бесплатном режиме доступно {FREE_CHAT_LIMIT} AI-сообщений в месяц.\n\n"
-    f"Оформите подписку <b>«Сад Про»</b> за {SUBSCRIPTION_PRICE} ₽/мес "
-    f"и получите безлимитные консультации + скидку 10% на все услуги!"
-)
+# TODO(владелец/Аня): формулировка заглушка. Подписки «Сад Про» больше нет
+# (решение владельца 26.09.2026), а что предлагать клиенту при исчерпании
+# лимита — не решено (лимиты не сбрасываются, «в месяц» в старом тексте
+# было неверно).
+LIMIT_REACHED_TEXT = "⚠️ <b>Лимит бесплатных сообщений исчерпан.</b>"
 
 
 @router.message(Command("chat"))
@@ -143,13 +142,13 @@ async def handle_text_message(message: Message):
 
     # Проверяем бонусные сообщения (приоритет над обычным лимитом)
     use_bonus = False
-    if not user.is_subscribed and user.bonus_messages > 0:
+    if user.bonus_messages > 0:
         use_bonus = True
     elif not can_use_chat(user, FREE_CHAT_LIMIT):
         await message.answer(
             LIMIT_REACHED_TEXT,
             parse_mode="HTML",
-            reply_markup=subscribe_keyboard(),
+            reply_markup=back_to_menu_keyboard(),
         )
         return
 
@@ -179,19 +178,16 @@ async def handle_text_message(message: Message):
     await add_message_to_history(user, "assistant", response)
 
     # Обновляем счётчик
-    if not user.is_subscribed:
-        if use_bonus:
-            # Списываем бонусное сообщение
-            await add_bonus_messages(user.telegram_id, -1)
-            user.bonus_messages -= 1
-            footer = f"\n\n<i>Использовано бонусное сообщение. Осталось бонусных: {user.bonus_messages}</i>"
-        else:
-            user.chat_count += 1
-            remaining = FREE_CHAT_LIMIT - user.chat_count
-            await update_user(user)
-            footer = f"\n\n<i>Осталось бесплатных сообщений: {remaining}/{FREE_CHAT_LIMIT}</i>"
+    if use_bonus:
+        # Списываем бонусное сообщение
+        await add_bonus_messages(user.telegram_id, -1)
+        user.bonus_messages -= 1
+        footer = f"\n\n<i>Использовано бонусное сообщение. Осталось бонусных: {user.bonus_messages}</i>"
     else:
-        footer = ""
+        user.chat_count += 1
+        remaining = FREE_CHAT_LIMIT - user.chat_count
+        await update_user(user)
+        footer = f"\n\n<i>Осталось бесплатных сообщений: {remaining}/{FREE_CHAT_LIMIT}</i>"
 
     await message.answer(
         response + footer,

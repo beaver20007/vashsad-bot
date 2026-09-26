@@ -21,8 +21,6 @@ REQUIRED_ENV = [
 ]
 
 OPTIONAL_ENV = [
-    ("YOOKASSA_SHOP_ID", "YooKassa shop ID for payments"),
-    ("YOOKASSA_SECRET_KEY", "YooKassa secret key"),
     ("OPENWEATHER_API_KEY", "OpenWeatherMap API key"),
     ("ADMIN_TOKEN", "Admin token for API routes"),
     ("MINI_APP_URL", "Miniapp URL for deep links"),

@@ -325,23 +325,19 @@ async def cmd_profile(message: Message):
         username=message.from_user.username,
         first_name=message.from_user.first_name,
     )
-    status = "⭐ Сад Про (безлимит)" if user.is_subscribed else "🆓 Бесплатный"
-    rem_chat   = max(0, FREE_CHAT_LIMIT   - user.chat_count)
+    rem_chat  = max(0, FREE_CHAT_LIMIT   - user.chat_count)
     rem_photo  = max(0, FREE_PHOTO_LIMIT  - user.photo_count)
     rem_plants = max(0, FREE_PLANTS_LIMIT - user.plants_count)
     reg_date = user.created_at.strftime("%d.%m.%Y") if user.created_at else "—"
 
     builder = InlineKeyboardBuilder()
-    if not user.is_subscribed:
-        builder.row(InlineKeyboardButton(text="⭐ Оформить Сад Про", callback_data="menu:subscribe"))
     builder.row(InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main"))
 
     await message.answer(
         f"👤 <b>Ваш профиль</b>\n\n"
         f"Имя: {user.first_name or '—'}\n"
-        f"Статус: <b>{status}</b>\n"
         f"В ВашСад с: {reg_date}\n\n"
-        f"<b>Осталось в этом месяце:</b>\n"
+        f"<b>Осталось бесплатных запросов:</b>\n"
         f"💬 AI-чат: {rem_chat} из {FREE_CHAT_LIMIT}\n"
         f"📸 Фото-диагностика: {rem_photo} из {FREE_PHOTO_LIMIT}\n"
         f"🌱 Подбор растений: {rem_plants} из {FREE_PLANTS_LIMIT}",

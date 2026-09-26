@@ -21,18 +21,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "нравится, а дальше разберёмся вместе"
         ),
         "menu_hint": "Используйте кнопки быстрого доступа 👇",
-        "chat_limit_reached": (
-            "⚠️ Вы исчерпали лимит бесплатных сообщений.\n"
-            "Оформите подписку <b>Сад Про</b> для безлимитного доступа."
-        ),
-        "subscription_required": (
-            "⭐ Эта функция доступна в подписке <b>Сад Про</b>.\n"
-            "Нажмите кнопку ниже, чтобы оформить подписку."
-        ),
         "order_started": "📋 Оформление заявки на услугу. Выберите тип услуги:",
         "booking_started": "📅 Запись на консультацию. Укажите удобное время:",
         "plants_started": "🌱 Подбор растений. Расскажите об условиях вашего участка:",
-        "success_subscribed": "✅ Подписка <b>Сад Про</b> успешно оформлена! Пользуйтесь без ограничений 🌿",
         "error_generic": "❌ Что-то пошло не так. Попробуйте ещё раз или напишите в поддержку.",
     },
     "en": {
@@ -59,18 +50,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "<b>Choose where to start 👇</b>"
         ),
         "menu_hint": "Use the quick-access buttons below 👇",
-        "chat_limit_reached": (
-            "⚠️ You have used all your free messages.\n"
-            "Subscribe to <b>Garden Pro</b> for unlimited access."
-        ),
-        "subscription_required": (
-            "⭐ This feature is available with the <b>Garden Pro</b> subscription.\n"
-            "Press the button below to subscribe."
-        ),
         "order_started": "📋 Starting your service request. Please choose a service type:",
         "booking_started": "📅 Booking a consultation. Please specify a convenient time:",
         "plants_started": "🌱 Plant selection. Tell us about your plot conditions:",
-        "success_subscribed": "✅ <b>Garden Pro</b> subscription activated! Enjoy unlimited access 🌿",
         "error_generic": "❌ Something went wrong. Please try again or contact support.",
     },
 }
