@@ -2504,3 +2504,10 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 - Откат: DELETE FROM content_strings WHERE namespace='bot_text' (строки были новыми, бот вернётся на файл-дефолт).
 - Бот подхватил строки refresh-задачей в 15:28:58 UTC (загружено 6), WARNING про fallback после этого нет. Живой /start и FAQ (география работы) OK.
 - НАЙДЕН БАГ (не связан с seed, не исправлен): handlers/start.py cb_cancel и /start не делают state.clear() - кнопка Отмена и /start не выходят из FSM (plan/watering/plants и др.), пока пользователь не дойдёт до конца; текст в это время съедается FSM-обработчиком, а не чатом/FAQ.
+
+### 2026-09-26 - PR #43 (FSM clear) в проде + разбор общего Redis
+- #43 смержен: 2110d40, деплой vashsad-bot 7dc644fb SUCCESS, коммит на сервисе = 2110d40. Живая цепочка /plan -> площадь -> Отмена -> FAQ и /plan -> площадь -> /start -> FAQ: OK, ключ fsm:1288492012:1288492012:state после Отмены и после /start отсутствует.
+- Redis ОБЩИЙ: fingerprint (sha256 host:port/db) REDIS_URL у vashsad-bot совпадает с локальными .env langtalk и careerai-bot; у overflowing-integrity другой. В том же Redis лежат FSM-ключи чужих ботов (LessonStates - langtalk, GenerateStates - aituner). Ключи aiogram без bot_id (DefaultKeyBuilder with_bot_id=False), формат fsm:<chat>:<user>:<state|data>.
+- aiogram 3.7.0 (requirements.txt): FSMContext.clear() = set_state(None) + set_data({}); RedisStorage.set_state(None) и set_data({}) делают redis.delete (fsm/context.py:30-32, fsm/storage/redis.py:84-85 и 109-110 в v3.7.0). Значит /start и Отмена стирают и state, и data пользователя - в том числе чужих ботов на том же ключе.
+- Факт потери: до живых тестов у владельца был data-ключ с lesson_id (langtalk); после Отмены/ /start его нет. Это данные незавершённого урока владельца в langtalk (эфемерный FSM-контекст).
+- Открытое решение владельца: разнести ключи (prefix/with_bot_id или отдельный Redis) - не вводилось, чужие ключи не трогались.
