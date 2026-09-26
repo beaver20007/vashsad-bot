@@ -155,9 +155,7 @@ python bot.py
 | `DESIGNER_TELEGRAM_ID` | Да | Telegram ID дизайнера для уведомлений |
 | `DESIGNER_NAME` | Да | Имя дизайнера (именительный падеж) |
 | `DESIGNER_NAME_GEN` | Да | Имя дизайнера (родительный падеж, для «помощник Имени») |
-| `REDIS_URL` | Да | Redis URL (`redis://...` или Upstash URL) |
-| `UPSTASH_REDIS_REST_URL` | Нет | REST URL Upstash (если не используешь `REDIS_URL`) |
-| `UPSTASH_REDIS_REST_TOKEN` | Нет | Токен Upstash REST API |
+| `REDIS_URL` | Да | Redis URL (`redis://...` или `rediss://...` для Upstash); единственный способ подключения — REST-API Upstash не поддерживается |
 | `MINI_APP_URL` | Нет | URL Mini App на Vercel (для кнопки WebApp) |
 | `MINIAPP_URL` | Нет | Дублирует `MINI_APP_URL` (используется в deep-links) |
 | `WELCOME_IMAGE_URL` | Нет | `file_id` приветственного изображения в Telegram |
