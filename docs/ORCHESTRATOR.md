@@ -2489,3 +2489,8 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 - pytest на main после #38: 73 passed, 11 skipped, 1 xfailed, 0 failed. Расхождение 66->64 после #37: удалены 3 теста подписки (test_subscribed_user_ignores_limit, 2x test_subscription_price_*), добавлен test_bonus_messages_extend_limit.
 - bot_text в content_strings пока пуст (seed --apply не запускался): бот работает на файле-дефолте, в логе WARNING на каждый ключ - ожидаемо.
 - Ждут слова: #40 (после #38, ретаргет на main), #41 (после #40), seed --apply.
+
+### 2026-09-26 - мержи #40, #41
+- #40 -> d93295c (ruff 75->45, все E501; немые except логируются), #41 -> 7c02e72 (VAPID-проверка, @vashsad_bot, UPSTASH_REDIS_REST). Деплой SUCCESS, живой /start OK; pytest 73 passed / 0 failed.
+- Миграция DROP COLUMN users.push_subscription НЕ готовилась и НЕ применялась: колонку использует miniapp (app/api/push/subscribe, push/send, admin/push-send). Ждёт отдельного трека в miniapp.
+- Серия 2026-09-26 (PR #37-#41) закрыта. Открыто: seed_bot_texts.py --apply (слово владельца), вопросы владельцу/Ане (см. запись выше).

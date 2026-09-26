@@ -15,8 +15,6 @@
 
 | Трек | Ветка | PR | База | Статус |
 |---|---|---|---|---|
-| ruff-cleanup-and-logging | `chore/t-ruff-cleanup-and-logging` | #40 | ветка #38 | после #37, #38 |
-| remove-dead-webpush-and-old-branding | `chore/t-remove-dead-webpush-and-old-branding` | #41 | ветка #40 | после #40; миграция `push_subscription` НЕ готовилась (miniapp использует колонку) |
 
 После мержа базовой ветки — ретаргет следующего PR на `main`.
 
