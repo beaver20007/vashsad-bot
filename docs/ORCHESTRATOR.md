@@ -2511,3 +2511,19 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
 - aiogram 3.7.0 (requirements.txt): FSMContext.clear() = set_state(None) + set_data({}); RedisStorage.set_state(None) и set_data({}) делают redis.delete (fsm/context.py:30-32, fsm/storage/redis.py:84-85 и 109-110 в v3.7.0). Значит /start и Отмена стирают и state, и data пользователя - в том числе чужих ботов на том же ключе.
 - Факт потери: до живых тестов у владельца был data-ключ с lesson_id (langtalk); после Отмены/ /start его нет. Это данные незавершённого урока владельца в langtalk (эфемерный FSM-контекст).
 - Открытое решение владельца: разнести ключи (prefix/with_bot_id или отдельный Redis) - не вводилось, чужие ключи не трогались.
+
+## Известные ловушки
+
+Правило: сюда попадает только урок уровня «стоил часов или инцидента»; рутинные заметки — не сюда. Каждая запись — факт из реального случая с датой и ссылкой на коммит/PR, не предположение.
+
+Шаблон записи: `Дата — Симптом (что увидели) — Причина (установлено фактом) — Как не наступить (конкретное действие) — Источник (коммит/PR)`.
+
+Записей пока нет.
+
+
+### 2026-09-26 - PR #44 и #45: FSM в общем Redis и выходы из анкеты
+- #44 (fix/fsm-redis-namespace) -> merge-коммит bde7080 (коммит 2f645a9): ключи FSM `vashsad_fsm:<bot_id>:<chat>:<user>:state|data`, TTL 24 ч (state_ttl = data_ttl = 86400, aiogram 3.7.0 redis.py:90 и :115). Деплой vashsad-bot и overflowing-integrity: commitHash = bde7080. Живая цепочка: /plan -> площадь 6 -> ключ PlanForm:waiting_style, ttl 86376 с -> Отмена -> ключей нет -> FAQ. Ключи `fsm:*` чужих ботов не читались и не менялись.
+- #45 (fix/fsm-plan-exits) -> merge-коммит 2430317 (коммит a1b2063): handlers/plan_exit.py (outer-middleware: в состоянии PlanForm любая команда кроме /plan и любой callback кроме budget:*, plan:*, nps:* сбрасывает состояние), _start_plan очищает состояние, защита от не-текста (подсказка bot_text/plan/text_only из файла-дефолта; в БД не записана, в логе ожидаемый WARNING про fallback). Деплой на оба сервиса: commitHash = 2430317.
+- Живые проверки #45 с аккаунта владельца через Telegram Web, после каждого шага чтение ключа: /price, /profile, /order, кнопка «Главное меню» на старом сообщении -> ключей нет; стикер в waiting_style -> подсказка, ключ остался waiting_style; повторный /plan из waiting_confirm -> waiting_area, data нет; анкета целиком (площадь, стиль текстом, бюджет кнопкой, пожелания) дошла до экрана подтверждения, кнопку «Подтвердить» не нажимали. Ошибок в логах Railway: 0.
+- Тесты на aiogram 3.7.0 (py3.12 venv из requirements.txt): main 80, после #44 84, после #45 102 passed, 0 failed.
+- Что делает «Подтвердить» (plan.py:186): вызывает Claude API, пишет заявку в orders (save_order, service_type=plan), уведомляет DESIGNER_TELEGRAM_ID (это владелец) и DESIGNER_TELEGRAM_ID_2, отправляет PDF пользователю - боевое, в живых проверках не нажималось.
