@@ -2483,3 +2483,9 @@ commit `d9a2209`. Локальный main — fast-forward, `pytest tests/` →
   miniapp; промокоды; фиксированная цена «3 500 ₽» в сезонном тексте;
   обещания в FAQ (нужна Аня); английское «certified» в welcome; onboarding
   STYLES захардкожен; MONTHLY_TIPS/_SEASONAL_TIPS/QUICK_TIPS не вынесены.
+
+### 2026-09-26 - мержи #37, #39, #38
+- #37 -> 5b46c5c, #39 -> 0116fe3, #38 -> 0f92ce5. Деплой Railway SUCCESS (оба сервиса), живой /start OK после #37 и после #38.
+- pytest на main после #38: 73 passed, 11 skipped, 1 xfailed, 0 failed. Расхождение 66->64 после #37: удалены 3 теста подписки (test_subscribed_user_ignores_limit, 2x test_subscription_price_*), добавлен test_bonus_messages_extend_limit.
+- bot_text в content_strings пока пуст (seed --apply не запускался): бот работает на файле-дефолте, в логе WARNING на каждый ключ - ожидаемо.
+- Ждут слова: #40 (после #38, ретаргет на main), #41 (после #40), seed --apply.
