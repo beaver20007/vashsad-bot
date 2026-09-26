@@ -154,3 +154,54 @@ async def test_plan_generate_sends_readable_pdf_when_font_is_available():
     callback.message.answer_document.assert_awaited_once()
     sent = callback.message.answer_document.await_args.args[0]
     assert sent.data.startswith(b"%PDF") and "Входная зона" in _text(sent.data)
+
+# ── геометрия обложки и линий (PyMuPDF): линия не должна пересекать текст ────────────────────────────
+def _geometry(pdf: bytes):
+    """[(page_no, words[(x0,y0,x1,y1,word)], hlines[(x0,x1,y,width)])]"""
+    pymupdf = pytest.importorskip("pymupdf")
+    out = []
+    doc = pymupdf.open(stream=pdf, filetype="pdf")
+    for no, page in enumerate(doc, 1):
+        lines = []
+        for d in page.get_drawings():
+            for it in d["items"]:
+                if it[0] == "l" and abs(it[1].y - it[2].y) < 0.5 and abs(it[1].x - it[2].x) > 5:
+                    lines.append((min(it[1].x, it[2].x), max(it[1].x, it[2].x), it[1].y, d.get("width") or 0))
+                elif it[0] == "re" and it[1].height < 3 and it[1].width > 5:
+                    r = it[1]
+                    lines.append((r.x0, r.x1, (r.y0 + r.y1) / 2, r.height))
+        out.append((no, [w[:5] for w in page.get_text("words")], lines))
+    return out
+
+
+def _crossings(words, lines):
+    hits = []
+    for x0, x1, y, w in lines:
+        for wd in words:
+            if wd[0] < x1 and wd[2] > x0 and wd[1] - w / 2 < y < wd[3] + w / 2:
+                hits.append((wd[4], round(y, 2), round(wd[1], 2), round(wd[3], 2)))
+    return hits
+
+
+def test_cover_rule_does_not_cross_the_title_and_keeps_a_gap():
+    pages = _geometry(_make_pdf())
+    no, words, lines = pages[0]
+    title = [w for w in words if w[4] in ("ПЛАН", "САДА")]
+    assert len(title) == 2
+    assert _crossings(words, lines) == []
+    title_bottom = max(w[3] for w in title)
+    below = [y for _, _, y, _ in lines if y >= title_bottom]  # линия под заголовком
+    assert below, "под заголовком обложки нет линии"
+    assert min(below) - title_bottom >= 6.0, (min(below), title_bottom)
+
+
+def test_no_horizontal_line_crosses_any_word_on_any_page():
+    pdf = _make_pdf("\n\n".join([SAMPLE_PLAN] * 3))  # длинный образец: несколько страниц
+    pages = _geometry(pdf)
+    assert len(pages) >= 3
+    for no, words, lines in pages:
+        assert _crossings(words, lines) == [], f"page {no}"
+
+
+def test_cover_title_leading_is_at_least_1_2_of_font_size():
+    assert pdf_generator.COVER_TITLE_LEADING >= 1.2 * pdf_generator.COVER_TITLE_SIZE

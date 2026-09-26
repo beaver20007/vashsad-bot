@@ -50,6 +50,9 @@ log = logging.getLogger(__name__)
 # Кириллица в PDF плана: стандартный Helvetica её не содержит (буквы превращаются в чёрные квадраты),
 # поэтому используется встроенный DejaVu Sans (лицензия — assets/fonts/LICENSE_DEJAVU). Путь — от модуля, не от cwd.
 FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+# обложка плана: интервал заголовка не меньше 1.2 кегля, иначе линия под ним (HRFlowable) ложится поверх текста
+COVER_TITLE_SIZE = 28
+COVER_TITLE_LEADING = 34
 PDF_FONT = "DejaVuSans"
 PDF_FONT_BOLD = "DejaVuSans-Bold"
 _FONT_FILES = {PDF_FONT: "DejaVuSans.ttf", PDF_FONT_BOLD: "DejaVuSans-Bold.ttf"}
@@ -139,7 +142,7 @@ def generate_plan_pdf(
 
     cover_title_style = ParagraphStyle(
         "CoverTitle", parent=styles["Normal"],
-        fontSize=28, textColor=SAGE, alignment=TA_CENTER,
+        fontSize=COVER_TITLE_SIZE, leading=COVER_TITLE_LEADING, textColor=SAGE, alignment=TA_CENTER,
         fontName=PDF_FONT_BOLD, spaceAfter=8,
     )
     cover_sub_style = ParagraphStyle(
