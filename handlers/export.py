@@ -139,14 +139,14 @@ async def cb_csv(callback: CallbackQuery):
     async with pool.acquire() as conn:
         if period == "all":
             rows = await conn.fetch(
-                "SELECT id, telegram_id, service_name AS service_type, status, created_at, phone AS contact_phone, service_price AS budget_range "
+                "SELECT id, telegram_id, service_name AS service_type, status, created_at, phone AS contact_phone, service_price "
                 "FROM orders ORDER BY created_at DESC"
             )
             period_label = "Все заявки"
         else:
             days = int(period)
             rows = await conn.fetch(
-                "SELECT id, telegram_id, service_name AS service_type, status, created_at, phone AS contact_phone, service_price AS budget_range "
+                "SELECT id, telegram_id, service_name AS service_type, status, created_at, phone AS contact_phone, service_price "
                 "FROM orders WHERE created_at > NOW() - INTERVAL '1 day' * $1 ORDER BY created_at DESC",
                 days,
             )
@@ -154,7 +154,7 @@ async def cb_csv(callback: CallbackQuery):
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
-    writer.writerow(["ID", "Telegram ID", "Услуга", "Статус", "Дата", "Телефон", "Бюджет"])
+    writer.writerow(["ID", "Telegram ID", "Услуга", "Статус", "Дата", "Телефон", "Цена услуги, ₽"])
     for row in rows:
         writer.writerow([
             row["id"],
@@ -163,7 +163,7 @@ async def cb_csv(callback: CallbackQuery):
             row.get("status", ""),
             row["created_at"].strftime("%Y-%m-%d %H:%M") if row.get("created_at") else "",
             row.get("contact_phone", ""),
-            row.get("budget_range", ""),
+            row.get("service_price", ""),
         ])
 
     csv_bytes = output.getvalue().encode("utf-8-sig")  # BOM for Excel
