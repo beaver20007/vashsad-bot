@@ -1,4 +1,6 @@
 """Хендлер подбора растений"""
+import logging
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -12,10 +14,12 @@ from keyboards import (
     plants_region_keyboard,
     plants_type_keyboard,
 )
-from services.ai import select_plants
+from services import i18n
+from services.ai import is_error_response, select_plants
 from services.database import can_use_plants, get_or_create_user, update_user
 
 router = Router()
+log = logging.getLogger(__name__)
 
 
 class PlantsForm(StatesGroup):
@@ -127,10 +131,7 @@ async def cb_light(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.clear()
 
-    # Проверяем лимит и обновляем счётчик
     user = await get_or_create_user(callback.from_user.id)
-    user.plants_count += 1
-    await update_user(user)
 
     await callback.message.edit_text(
         "🔍 <b>Подбираю растения для вас...</b>\n\n"
@@ -144,6 +145,19 @@ async def cb_light(callback: CallbackQuery, state: FSMContext):
 
     result = await select_plants(data)
 
+    if is_error_response(result):
+        # select_plants (services/ai.py) вернул текст ошибки/таймаута строкой —
+        # лимит не тратим (счётчик увеличивается только после успеха, ниже),
+        # клиенту — предложение повторить, не мусорный результат с текстом
+        # ошибки (тот же принцип, что в handlers/plan.py, PR #48).
+        log.error("cb_light: select_plants вернул ошибку для user %s: %r", callback.from_user.id, result)
+        await callback.message.edit_text(i18n.t("error_generic"), reply_markup=back_to_menu_keyboard())
+        return
+
+    # Счётчик обновляем только после успешного результата (раньше списывался
+    # безусловно ещё до вызова Claude — лимит терялся даже при сбое).
+    user.plants_count += 1
+    await update_user(user)
     remaining = FREE_PLANTS_LIMIT - user.plants_count
     remaining_text = f"\n\n<i>Осталось бесплатных запросов: {remaining}/{FREE_PLANTS_LIMIT}</i>"
 

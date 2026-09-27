@@ -1,11 +1,14 @@
 """Хендлер фото-диагностики — с сохранением в PostgreSQL"""
+import logging
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, PhotoSize
 
 from config import FREE_PHOTO_LIMIT
 from keyboards import back_to_menu_keyboard, cancel_keyboard
-from services.ai import ask_claude_with_image
+from services import i18n
+from services.ai import ask_claude_with_image, is_error_response
 from services.database import (
     can_use_photo,
     get_or_create_user,
@@ -15,6 +18,7 @@ from services.database import (
 )
 
 router = Router()
+log = logging.getLogger(__name__)
 
 # TODO(владелец/Аня): формулировка заглушка — подписки «Сад Про» больше нет
 # (решение владельца 26.09.2026), что предлагать при исчерпании лимита — не решено.
@@ -101,6 +105,15 @@ async def handle_photo(message: Message):
         mime_type="image/jpeg",
         question=user_question,
     )
+
+    if is_error_response(result):
+        # ask_claude_with_image вернул текст ошибки/таймаута строкой — не
+        # сохраняем диагностику и не списываем лимит (тот же принцип, что
+        # в handlers/plan.py, PR #48).
+        log.error("handle_photo: ask_claude_with_image вернул ошибку для user %s: %r", message.from_user.id, result)
+        await processing_msg.delete()
+        await message.answer(i18n.t("error_generic"), reply_markup=back_to_menu_keyboard())
+        return
 
     # ── Сохраняем диагностику в БД ──
     await save_diagnosis(
