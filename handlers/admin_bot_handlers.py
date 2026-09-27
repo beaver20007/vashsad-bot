@@ -20,6 +20,7 @@ from services.admin_auth import (
 )
 from services.content_texts import get_order_status_text
 from services.database import get_ab_stats, get_designer_stats, get_pool, update_order_status
+from services.loomy_crosspost import LoomyCrosspostNotConfigured, send_crosspost
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ async def cmd_start(message: Message):
         await message.answer(
             f"👋 Снова здравствуйте! Ваша роль: <b>{role}</b>.\n\n"
             "Команды: /stats /orders /broadcast /broadcast_segment /ab_stats "
-            "/ban /unban /whitelist /bans /reset_onboarding /add_admin",
+            "/ban /unban /whitelist /bans /reset_onboarding /add_admin /crosspost",
             parse_mode="HTML",
         )
         return
@@ -901,3 +902,66 @@ async def cmd_reset_onboarding(message: Message):
         await message.answer(f"Пользователь {target_id} не найден.")
         return
     await message.answer(f"🔄 Онбординг сброшен для {target_id}.")
+
+
+# ---------------------------------------------------------------------------
+# /crosspost — Аня отправляет текст поста, он уходит на n8n-вебхук LOOMY.
+#
+# ВАЖНО: собственно отправка (services/loomy_crosspost.send_crosspost) пока
+# не реализована — имя заголовка авторизации и переменная окружения с
+# секретом не согласованы с Чатом LOOMY (см. docs/ORCHESTRATOR.md). Этот
+# хендлер собирает текст от Ани и вызывает send_crosspost(); пока она
+# бросает LoomyCrosspostNotConfigured, Аня видит явное сообщение об этом,
+# а не тихую отправку с угаданным форматом или тихую потерю текста.
+# ---------------------------------------------------------------------------
+
+# Ожидание текста поста для кросс-постинга: admin_id -> True
+_pending_crossposts: set[int] = set()
+
+
+@router.message(Command("crosspost"))
+async def cmd_crosspost_start(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    _pending_crossposts.add(message.from_user.id)
+    await message.answer(
+        "📤 <b>Кросс-постинг в LOOMY</b>\n\n"
+        "Следующим сообщением отправьте текст поста. Отмена: /cancel_crosspost",
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("cancel_crosspost"))
+async def cmd_cancel_crosspost(message: Message):
+    if message.from_user.id in _pending_crossposts:
+        _pending_crossposts.discard(message.from_user.id)
+        await message.answer("❌ Кросс-постинг отменён.")
+
+
+@router.message(lambda msg: msg.from_user.id in _pending_crossposts and not (msg.text or "").startswith("/"))
+async def receive_crosspost_text(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    _pending_crossposts.discard(message.from_user.id)
+
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("⚠️ Пустой текст, отправка отменена. Начните заново: /crosspost")
+        return
+
+    try:
+        await send_crosspost(text)
+    except LoomyCrosspostNotConfigured:
+        log.warning("crosspost: send_crosspost не настроен (admin_id=%s)", message.from_user.id)
+        await message.answer(
+            "✅ Текст принят, но отправка в LOOMY пока не настроена — ждём от "
+            "Чата LOOMY формат заголовка авторизации и схему тела. Как только "
+            "согласуем, отправка заработает без повторного ввода команды.",
+        )
+        return
+    except Exception as e:
+        log.error("crosspost: send_crosspost упал (admin_id=%s): %s", message.from_user.id, e)
+        await message.answer("❌ Не удалось отправить в LOOMY. Попробуйте ещё раз или сообщите владельцу.")
+        return
+
+    await message.answer("✅ Отправлено в LOOMY.")
