@@ -106,6 +106,7 @@ def test_missing_font_raises_and_logs_instead_of_making_a_squares_pdf(monkeypatc
 async def test_plan_generate_skips_pdf_but_sends_plan_when_font_is_missing(monkeypatch, tmp_path, caplog):
     _unavailable_fonts(monkeypatch, tmp_path)
     state = MagicMock()
+    state.get_state = AsyncMock(return_value=plan.PlanForm.waiting_confirm.state)
     state.get_data = AsyncMock(return_value={"area": "6", "style": "природный", "budget": "до 100к", "wishes": "ТЕСТ"})
     state.clear = AsyncMock()
     callback = MagicMock()
@@ -123,7 +124,7 @@ async def test_plan_generate_skips_pdf_but_sends_plan_when_font_is_missing(monke
          patch.object(plan, "_notify_designer", AsyncMock()), \
          patch.object(plan, "get_designer_qualification_line", AsyncMock(return_value="q")), \
          caplog.at_level(logging.WARNING):
-        await plan.plan_generate(callback, state)  # исключение не вылетает
+        await plan._plan_generate(callback, state)  # исключение не вылетает
 
     callback.message.answer.assert_awaited()  # сообщение с планом ушло
     callback.message.answer_document.assert_not_awaited()  # PDF не отправлен
@@ -133,6 +134,7 @@ async def test_plan_generate_skips_pdf_but_sends_plan_when_font_is_missing(monke
 @pytest.mark.asyncio
 async def test_plan_generate_sends_readable_pdf_when_font_is_available():
     state = MagicMock()
+    state.get_state = AsyncMock(return_value=plan.PlanForm.waiting_confirm.state)
     state.get_data = AsyncMock(return_value={"area": "6", "style": "природный", "budget": "до 100к", "wishes": "ТЕСТ"})
     state.clear = AsyncMock()
     callback = MagicMock()
@@ -149,7 +151,7 @@ async def test_plan_generate_sends_readable_pdf_when_font_is_available():
          patch.object(plan, "get_or_create_user", AsyncMock()), \
          patch.object(plan, "_notify_designer", AsyncMock()), \
          patch.object(plan, "get_designer_qualification_line", AsyncMock(return_value="q")):
-        await plan.plan_generate(callback, state)
+        await plan._plan_generate(callback, state)
 
     callback.message.answer_document.assert_awaited_once()
     sent = callback.message.answer_document.await_args.args[0]
