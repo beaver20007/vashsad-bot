@@ -11,7 +11,7 @@ from aiogram.filters import Command
 from aiogram.types import BufferedInputFile, Message
 
 from config import DESIGNER_NAME
-from services.ai import ask_claude
+from services.ai import ask_claude, is_error_response
 from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, get_pool
 from services.pdf_generator import generate_plan_pdf
@@ -103,7 +103,7 @@ async def cmd_season_plan(message: Message) -> None:
         system=SEASON_PLAN_SYSTEM,
     )
 
-    if plan_text.startswith("❌") or plan_text.startswith("⏳"):
+    if is_error_response(plan_text):
         await message.answer(plan_text)
         return
 
