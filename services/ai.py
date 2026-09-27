@@ -8,6 +8,19 @@ from services import bot_texts
 
 log = logging.getLogger(__name__)
 
+# ask_claude / ask_claude_with_image не бросают исключение при сбое или
+# таймауте — возвращают текст ошибки строкой с одним из этих префиксов
+# (см. случаи ниже). Вызывающий код должен проверять это перед тем, как
+# считать ответ результатом (не тратить лимит, не сохранять как валидную
+# запись, не показывать эту строку как содержательный ответ).
+ERROR_PREFIXES = ("❌", "⏳", "⚠️")
+
+
+def is_error_response(text: str) -> bool:
+    """True, если ask_claude/ask_claude_with_image вернули текст ошибки, а не результат."""
+    return text.startswith(ERROR_PREFIXES)
+
+
 async def ask_claude(messages: list, system: str = None) -> str:
     """Отправить запрос к Claude API и получить ответ"""
     if not ANTHROPIC_API_KEY:

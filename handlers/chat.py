@@ -1,12 +1,14 @@
 """Хендлер AI-чата по садоводству"""
+import logging
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from config import FREE_CHAT_LIMIT
 from keyboards import back_to_menu_keyboard
-from services import bot_texts
-from services.ai import ask_claude
+from services import bot_texts, i18n
+from services.ai import ask_claude, is_error_response
 from services.database import (
     add_bonus_messages,
     add_message_to_history,
@@ -16,6 +18,7 @@ from services.database import (
 )
 
 router = Router()
+log = logging.getLogger(__name__)
 
 _REGION_CLIMATE: dict[str, str] = {
     "Нижегородская обл.": "Пользователь из Нижегородской области, климатическая зона 4b. Учитывай холодные зимы (до -30°C), короткое лето, суглинистые почвы.",
@@ -119,6 +122,14 @@ async def handle_text_message(message: Message):
 
     # Отправляем запрос к Claude с историей для контекста
     response = await ask_claude(user.chat_history, system=system)
+
+    if is_error_response(response):
+        # ask_claude вернул текст ошибки/таймаута строкой (не исключение) —
+        # не пишем это в историю как ответ ассистента и не списываем лимит
+        # (тот же принцип, что в handlers/plan.py, PR #48).
+        log.error("handle_text_message: ask_claude вернул ошибку для user %s: %r", user.telegram_id, response)
+        await message.answer(i18n.t("error_generic"), reply_markup=back_to_menu_keyboard())
+        return
 
     # Сохраняем ответ в историю
     await add_message_to_history(user, "assistant", response)
