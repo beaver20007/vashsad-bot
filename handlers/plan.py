@@ -1,4 +1,5 @@
 """Хендлер генерации плана участка — пошаговый FSM"""
+import asyncio
 import logging
 
 from aiogram import F, Router
@@ -10,7 +11,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import DESIGNER_NAME, DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
 from keyboards import cancel_keyboard, plan_result_keyboard
-from services import bot_texts
+from services import bot_texts, i18n
 from services.ai import ask_claude
 from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, save_order
@@ -18,6 +19,18 @@ from services.pdf_generator import generate_plan_pdf
 
 router = Router()
 log = logging.getLogger(__name__)
+
+# ask_claude (services/ai.py) не бросает исключение при сбое/таймауте — возвращает
+# текст ошибки одной из этих строк (см. season_plan.py:106, тот же принцип).
+ASK_CLAUDE_ERROR_PREFIXES = ("❌", "⏳", "⚠️")
+
+# Защита от двойного тапа "Подтвердить": апдейты идут параллельными задачами
+# (Dispatcher без events_isolation), фильтр по waiting_confirm читает состояние
+# ДО хендлера — оба тапа проходят фильтр, если пришли почти одновременно.
+# Мьютекс на telegram_id сериализует обработку внутри одного процесса бота
+# (проверка/вход в `async with lock` — без await между ними, поэтому атомарна
+# для однопоточного event loop).
+_plan_confirm_locks: dict[int, asyncio.Lock] = {}
 
 
 class PlanForm(StatesGroup):
@@ -202,7 +215,25 @@ async def plan_restart(callback: CallbackQuery, state: FSMContext):
 # ── Шаг 5: подтверждение → генерация плана ──────────────────
 @router.callback_query(F.data == "plan:confirm", PlanForm.waiting_confirm)
 async def plan_generate(callback: CallbackQuery, state: FSMContext):
+    telegram_id = callback.from_user.id
+    lock = _plan_confirm_locks.setdefault(telegram_id, asyncio.Lock())
+    if lock.locked():
+        # Второй параллельный тап того же plan:confirm — уже обрабатывается.
+        await callback.answer()
+        return
+    async with lock:
+        try:
+            await _plan_generate(callback, state)
+        finally:
+            _plan_confirm_locks.pop(telegram_id, None)
+
+
+async def _plan_generate(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    if await state.get_state() != PlanForm.waiting_confirm.state:
+        # Состояние уже очищено (например, обработано до захвата блокировки) —
+        # это повторный тап, не новый запрос.
+        return
     data = await state.get_data()
     await state.clear()
 
@@ -246,6 +277,17 @@ async def plan_generate(callback: CallbackQuery, state: FSMContext):
 В конце: одно предложение — предложи заказать детальный проект, нажав кнопку «Заказать проект» ниже."""
 
     result = await ask_claude([{"role": "user", "content": prompt}])
+
+    if result.startswith(ASK_CLAUDE_ERROR_PREFIXES):
+        # ask_claude вернул текст ошибки/таймаута строкой (не исключение) — не
+        # создаём заявку, не уведомляем дизайнера, не генерируем PDF из текста
+        # ошибки; клиенту — предложение повторить.
+        log.error("plan_generate: ask_claude вернул ошибку для user %s: %r", callback.from_user.id, result)
+        try:
+            await callback.message.edit_text(i18n.t("error_generic"))
+        except Exception:
+            await callback.message.answer(i18n.t("error_generic"))
+        return
 
     # Сохраняем заявку в БД
     telegram_id = callback.from_user.id
