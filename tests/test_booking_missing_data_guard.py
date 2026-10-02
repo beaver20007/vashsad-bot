@@ -24,7 +24,7 @@ CLIENT_NAME = "Марина Петрова"
 CLIENT_PHONE = "+7 900 123-45-67"
 
 
-def _make_message(text: str | None, user_id: int = 1288492012) -> MagicMock:
+def _make_message(text: str | None, user_id: int = 100000001) -> MagicMock:
     msg = MagicMock()
     msg.text = text
     msg.from_user = SimpleNamespace(id=user_id, first_name=CLIENT_NAME, username="marina")
@@ -47,6 +47,8 @@ def _make_state(data: dict) -> AsyncMock:
     state = AsyncMock()
     state.get_data = AsyncMock(return_value=dict(data))
     state.clear = AsyncMock()
+    state.set_data = AsyncMock()
+    state.update_data = AsyncMock()
     return state
 
 
@@ -118,10 +120,36 @@ async def test_none_field_does_not_raise():
 
 
 @pytest.mark.asyncio
-async def test_missing_or_empty_phone_text_does_not_raise():
-    """Если в состоянии waiting_contact пришёл не текст (message.text=None) или пустая строка."""
+@pytest.mark.parametrize("text", [None, "", "   "])
+async def test_missing_or_empty_phone_text_does_not_raise(text):
+    """Анкета (слот/услуга) цела, но вместо номера пришёл не текст (None — например,
+    стикер/фото), пустая строка или только пробелы: клиент остаётся в форме, данные
+    анкеты и state не трогаем — это другой случай, чем реально утерянная анкета."""
     state = _make_state(FULL_DATA)
-    message = _make_message(None)  # например, стикер/фото вместо текста
+    message = _make_message(text)
+    bot = AsyncMock()
+    pool, conn = _mock_pool()
+
+    with patch.object(booking, "get_pool", AsyncMock(return_value=pool)):
+        await booking.process_contact(message, state, bot)  # не должно бросить исключение
+
+    conn.execute.assert_not_called()
+    state.clear.assert_not_called()  # форма НЕ сбрасывается — клиент остаётся в ней
+    state.set_data.assert_not_called()
+    state.update_data.assert_not_called()
+    message.answer.assert_awaited_once()
+    sent_text = message.answer.await_args.args[0]
+    assert "номер телефона" in sent_text.lower()
+    state.get_data.assert_awaited_once()  # анкету прочитали (проверили, что она цела)
+
+
+@pytest.mark.asyncio
+async def test_missing_form_field_takes_priority_over_missing_phone():
+    """Если не хватает и поля анкеты, и телефона — срабатывает ветка потери анкеты
+    (BOOKING_RETRY_TEXT + state.clear), а не просьба прислать телефон текстом."""
+    data = {k: v for k, v in FULL_DATA.items() if k != "slot_id"}  # анкета неполная
+    state = _make_state(data)
+    message = _make_message(None)  # и телефон тоже не пришёл текстом
     bot = AsyncMock()
     pool, conn = _mock_pool()
 
@@ -129,7 +157,11 @@ async def test_missing_or_empty_phone_text_does_not_raise():
         await booking.process_contact(message, state, bot)
 
     conn.execute.assert_not_called()
+    state.clear.assert_awaited_once()
     message.answer.assert_awaited_once()
+    sent_text = message.answer.await_args.args[0]
+    assert sent_text == booking.BOOKING_RETRY_TEXT
+    assert "номер телефона" not in sent_text.lower()
 
 
 # ── Сообщение клиенту: тон ВашСада, без технических слов ───────────────────
@@ -160,7 +192,7 @@ async def test_log_contains_field_names_but_not_client_data(caplog):
     bot = AsyncMock()
     pool, conn = _mock_pool()
 
-    with caplog.at_level(logging.ERROR, logger="handlers.booking"), \
+    with caplog.at_level(logging.WARNING, logger="handlers.booking"), \
          patch.object(booking, "get_pool", AsyncMock(return_value=pool)):
         await booking.process_contact(message, state, bot)
 
@@ -173,19 +205,39 @@ async def test_log_contains_field_names_but_not_client_data(caplog):
 
 
 @pytest.mark.asyncio
-async def test_log_for_missing_phone_names_phone_field_not_value(caplog):
+async def test_missing_form_field_logs_at_warning_not_error(caplog):
+    """Потеря анкеты — ожидаемая ситуация (TTL/мини-апп), а не поломка кода: WARNING."""
+    data = {"slot_id": 7}  # slot_dt, service_key, service_price отсутствуют
+    state = _make_state(data)
+    message = _make_message(CLIENT_PHONE)
+    bot = AsyncMock()
+    pool, conn = _mock_pool()
+
+    with caplog.at_level(logging.WARNING, logger="handlers.booking"), \
+         patch.object(booking, "get_pool", AsyncMock(return_value=pool)):
+        await booking.process_contact(message, state, bot)
+
+    levels = [r.levelname for r in caplog.records]
+    assert levels == ["WARNING"]
+
+
+@pytest.mark.asyncio
+async def test_missing_phone_text_does_not_log_client_data(caplog):
+    """Клиент прислал не текст вместо телефона — это не лог-достойное событие (ожидаемый
+    пользовательский ввод), но даже если что-то залогируется, там не должно быть данных."""
     state = _make_state(FULL_DATA)
     message = _make_message("")
     bot = AsyncMock()
     pool, conn = _mock_pool()
 
-    with caplog.at_level(logging.ERROR, logger="handlers.booking"), \
+    with caplog.at_level(logging.DEBUG, logger="handlers.booking"), \
          patch.object(booking, "get_pool", AsyncMock(return_value=pool)):
         await booking.process_contact(message, state, bot)
 
+    assert caplog.records == []  # для этого случая ничего не логируется
     log_text = " ".join(r.getMessage() for r in caplog.records)
-    assert "phone" in log_text
     assert CLIENT_PHONE not in log_text
+    assert CLIENT_NAME not in log_text
 
 
 # ── Регресс: полная заявка обрабатывается как раньше ───────────────────────

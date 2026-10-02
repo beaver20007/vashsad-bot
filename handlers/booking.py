@@ -43,6 +43,16 @@ BOOKING_RETRY_TEXT = (
     "минуты: /book"
 )
 
+# Клиент прислал не текст (фото/стикер), пустую строку или только пробелы
+# вместо номера, но данные анкеты (слот и услуга) целы — просим прислать
+# телефон текстом, не сбрасывая уже сделанный выбор. В тоне сообщения,
+# которым бот сам просит номер при входе в waiting_contact
+# (cb_book_phone_consent: "📞 Укажите ваш <b>телефон</b> для подтверждения:").
+BOOKING_PHONE_AS_TEXT = (
+    "📞 Пожалуйста, пришлите номер телефона обычным текстовым сообщением — "
+    "так мы сможем подтвердить запись."
+)
+
 
 def _missing_booking_fields(data: dict) -> list[str]:
     """Имена отсутствующих/пустых обязательных полей анкеты (без значений)."""
@@ -167,16 +177,23 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     phone = (message.text or "").strip()
     data  = await state.get_data()
 
+    # Сначала — анкета (слот/услуга): если её данные потеряны, телефон уже
+    # не имеет смысла проверять отдельно, это одна и та же проблема.
     missing = _missing_booking_fields(data)
-    if not phone:
-        missing.append("phone")
     if missing:
-        log.error(
+        log.warning(
             "process_contact: в анкете записи не хватает полей (user_id=%s): %s",
             message.from_user.id, ", ".join(missing),
         )
         await message.answer(BOOKING_RETRY_TEXT, parse_mode="HTML")
         await state.clear()
+        return
+
+    # Анкета цела, но вместо номера пришло не текстовое сообщение (или
+    # пустая строка/пробелы) — просим прислать телефон текстом и не трогаем
+    # ни state, ни уже выбранные слот/услугу: клиент остаётся в форме.
+    if not phone:
+        await message.answer(BOOKING_PHONE_AS_TEXT, parse_mode="HTML")
         return
 
     slot_id   = data["slot_id"]
