@@ -9,6 +9,7 @@
 """
 import html
 import logging
+import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -92,6 +93,12 @@ BOOKING_PHONE_AS_TEXT = (
     "или обычным текстовым сообщением, так мы сможем подтвердить запись."
 )
 
+# Текст прислан, но не похож на номер (буквы/разметка/слишком длинная строка и т.п.).
+BOOKING_PHONE_INVALID_TEXT = (
+    "📞 Это не похоже на номер телефона. Пришлите номер цифрами, например "
+    "+7 999 123-45-67, или нажмите «Поделиться номером»."
+)
+
 BOOKING_COMING_SOON_TEXT = (
     "📅 <b>Запись на консультацию скоро откроется</b>\n\n"
     "Мы вот-вот запустим запись прямо в боте. А пока можно оставить заявку "
@@ -138,13 +145,36 @@ def _missing_booking_fields(data: dict) -> list[str]:
 
 def _own_contact_phone(message: Message) -> str | None:
     """Номер из message.contact, только если контакт принадлежит самому
-    отправителю (пересланная чужая визитка не считается номером клиента)."""
+    отправителю (пересланная чужая визитка не считается номером клиента).
+    Формат не проверяем (это данные от Telegram, не свободный ввод) — только
+    ограничиваем длину под bookings.phone VARCHAR(32)."""
     contact = message.contact
     if contact is None:
         return None
     if contact.user_id and contact.user_id != message.from_user.id:
         return None
-    return contact.phone_number
+    return contact.phone_number[:32]
+
+
+# Телефон текстом: только цифры, пробелы, скобки, дефис и ведущий "+".
+PHONE_TEXT_ALLOWED_RE = re.compile(r"^\+?[0-9\s()-]+$")
+PHONE_TEXT_NON_DIGIT_RE = re.compile(r"\D")
+
+
+def _normalize_text_phone(text: str) -> str | None:
+    """Валидирует телефон, присланный текстом (НЕ кнопкой "Поделиться номером" —
+    туда идёт _own_contact_phone, без этой проверки). Разрешённые символы:
+    цифры, пробелы, скобки, дефис, ведущий "+". После очистки от
+    нецифровых символов должно остаться 10–15 цифр (разумный диапазон для
+    телефонного номера), итоговая строка — не длиннее bookings.phone
+    VARCHAR(32). Возвращает None, если формат не прошёл."""
+    text = text.strip()
+    if not text or len(text) > 32 or not PHONE_TEXT_ALLOWED_RE.match(text):
+        return None
+    digits = PHONE_TEXT_NON_DIGIT_RE.sub("", text)
+    if not (10 <= len(digits) <= 15):
+        return None
+    return text
 
 
 def _service_by_key(key: str) -> dict | None:
@@ -399,9 +429,17 @@ async def cb_book_phone_consent(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BookingForm.waiting_contact)
 async def process_contact(message: Message, state: FSMContext, bot: Bot):
-    # Кнопка "Поделиться номером" шлёт message.contact; запасной путь — текст.
+    # Кнопка "Поделиться номером" шлёт message.contact (формат не проверяем —
+    # данные от Telegram); запасной путь — текст (проверяем формат явно, см.
+    # _normalize_text_phone — свободный ввод мог быть чем угодно).
     own_phone = _own_contact_phone(message)
-    phone = (own_phone if own_phone else (message.text or "")).strip()
+    raw_text = (message.text or "").strip()
+    if own_phone:
+        phone = own_phone
+    elif raw_text:
+        phone = _normalize_text_phone(raw_text)
+    else:
+        phone = None
 
     data = await state.get_data()
 
@@ -417,11 +455,17 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
         await state.clear()
         return
 
-    # Анкета цела, но вместо номера пришло не текстовое сообщение (или
-    # пустая строка/пробелы, или чужой контакт) — просим прислать телефон
-    # ещё раз и не трогаем ни state, ни уже выбранные слот/услугу.
-    if not phone:
-        await message.answer(BOOKING_PHONE_AS_TEXT, parse_mode="HTML", reply_markup=_phone_entry_keyboard())
+    # Анкета цела, но телефон не получен: либо пришло не текстовое сообщение/
+    # пустая строка/чужой контакт (просим прислать номер), либо текст пришёл,
+    # но не похож на номер (объясняем формат) — в обоих случаях не трогаем
+    # ни state, ни уже выбранные слот/услугу.
+    if phone is None:
+        if raw_text and not own_phone:
+            await message.answer(
+                BOOKING_PHONE_INVALID_TEXT, parse_mode="HTML", reply_markup=_phone_entry_keyboard(),
+            )
+        else:
+            await message.answer(BOOKING_PHONE_AS_TEXT, parse_mode="HTML", reply_markup=_phone_entry_keyboard())
         return
 
     slot_id   = data["slot_id"]
@@ -489,7 +533,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
         f"🎉 <b>Запись подтверждена!</b>\n\n"
         f"📅 {_ru_dt_label(dt)} МСК\n"
         f"🛎 {svc_name}\n"
-        f"📞 {phone}\n\n"
+        f"📞 {html.escape(phone)}\n\n"
         f"Мы свяжемся с вами для подтверждения. До встречи! 🌿",
         parse_mode="HTML",
         reply_markup=builder_confirm.as_markup(),
@@ -534,7 +578,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
                 f"👤 {html.escape(user.first_name or '')} (@{user.username or '—'})\n"
                 f"🛎 {svc_name} — {svc_price:,} ₽\n"
                 f"📅 {_ru_dt_label(dt)} МСК\n"
-                f"📞 {phone}",
+                f"📞 {html.escape(phone)}",
                 parse_mode="HTML",
                 reply_markup=notify_kb.as_markup(),
             )
@@ -659,7 +703,7 @@ async def process_leave_request(message: Message, state: FSMContext, bot: Bot):
     if client_text:
         staff_lines.append(f"💬 {html.escape(client_text)}")
     if phone:
-        staff_lines.append(f"📞 {phone}")
+        staff_lines.append(f"📞 {html.escape(phone)}")
     staff_text = "\n".join(staff_lines)
 
     kb = InlineKeyboardBuilder()
