@@ -30,6 +30,34 @@ BOOKING_SERVICES = [
     ("Стратегия сада",             "strategy",      3900),
 ]
 
+# Обязательные поля анкеты записи к моменту ввода телефона (process_contact).
+# Без проверки перед прямым data["slot_id"] и т.п. неполная анкета (например,
+# data пережила TTL дольше, чем state — см. docs/ORCHESTRATOR.md,
+# fix/fsm-data-ttl-margin) роняет хендлер с KeyError.
+BOOKING_REQUIRED_FIELDS = ("slot_id", "slot_dt", "service_key", "service_price")
+
+BOOKING_RETRY_TEXT = (
+    "😔 <b>Не получилось оформить запись</b>\n\n"
+    "Похоже, анкета была открыта слишком долго, и часть информации "
+    "потерялась. Пожалуйста, оформите запись заново — это займёт меньше "
+    "минуты: /book"
+)
+
+# Клиент прислал не текст (фото/стикер), пустую строку или только пробелы
+# вместо номера, но данные анкеты (слот и услуга) целы — просим прислать
+# телефон текстом, не сбрасывая уже сделанный выбор. В тоне сообщения,
+# которым бот сам просит номер при входе в waiting_contact
+# (cb_book_phone_consent: "📞 Укажите ваш <b>телефон</b> для подтверждения:").
+BOOKING_PHONE_AS_TEXT = (
+    "📞 Пожалуйста, пришлите номер телефона обычным текстовым сообщением — "
+    "так мы сможем подтвердить запись."
+)
+
+
+def _missing_booking_fields(data: dict) -> list[str]:
+    """Имена отсутствующих/пустых обязательных полей анкеты (без значений)."""
+    return [f for f in BOOKING_REQUIRED_FIELDS if data.get(f) in (None, "")]
+
 
 async def _get_free_slots(days_ahead: int = 14) -> list[dict]:
     """Возвращает свободные слоты на ближайшие N дней."""
@@ -146,8 +174,28 @@ async def cb_book_phone_consent(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BookingForm.waiting_contact)
 async def process_contact(message: Message, state: FSMContext, bot: Bot):
-    phone = message.text.strip()
+    phone = (message.text or "").strip()
     data  = await state.get_data()
+
+    # Сначала — анкета (слот/услуга): если её данные потеряны, телефон уже
+    # не имеет смысла проверять отдельно, это одна и та же проблема.
+    missing = _missing_booking_fields(data)
+    if missing:
+        log.warning(
+            "process_contact: в анкете записи не хватает полей (user_id=%s): %s",
+            message.from_user.id, ", ".join(missing),
+        )
+        await message.answer(BOOKING_RETRY_TEXT, parse_mode="HTML")
+        await state.clear()
+        return
+
+    # Анкета цела, но вместо номера пришло не текстовое сообщение (или
+    # пустая строка/пробелы) — просим прислать телефон текстом и не трогаем
+    # ни state, ни уже выбранные слот/услугу: клиент остаётся в форме.
+    if not phone:
+        await message.answer(BOOKING_PHONE_AS_TEXT, parse_mode="HTML")
+        return
+
     slot_id   = data["slot_id"]
     slot_dt   = data["slot_dt"]
     svc_key   = data["service_key"]
