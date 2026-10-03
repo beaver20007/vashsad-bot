@@ -219,9 +219,19 @@ def _booking_restart_keyboard() -> InlineKeyboardMarkup:
 
 # ── Вход в запись (клиент) ──────────────────────────────────────────────
 
-async def _show_service_picker(send, state: FSMContext) -> None:
-    """send — message.answer или callback.message.edit_text (одинаковая сигнатура kwargs)."""
-    if not BOOKING_OPEN_FOR_CLIENTS:
+STAFF_PREVIEW_PREFIX = "🔧 Предпросмотр для сотрудников: клиентам запись пока закрыта.\n\n"
+
+
+async def _show_service_picker(send, state: FSMContext, telegram_id: int | None = None) -> None:
+    """send — message.answer или callback.message.edit_text (одинаковая сигнатура kwargs).
+
+    telegram_id — опционален; при закрытой для клиентов записи (BOOKING_OPEN_FOR_CLIENTS=false)
+    сотрудник (см. _is_booking_staff) всё равно видит обычный выбор формата — с пометкой
+    "предпросмотр" — чтобы можно было пройти сценарий записи без открытия её клиентам."""
+    staff_preview = (
+        not BOOKING_OPEN_FOR_CLIENTS and telegram_id is not None and _is_booking_staff(telegram_id)
+    )
+    if not BOOKING_OPEN_FOR_CLIENTS and not staff_preview:
         await send(BOOKING_COMING_SOON_TEXT, parse_mode="HTML", reply_markup=_booking_coming_soon_keyboard())
         await state.clear()
         return
@@ -233,8 +243,9 @@ async def _show_service_picker(send, state: FSMContext) -> None:
             callback_data=f"book_svc:{svc['key']}",
         ))
     b.row(InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main"))
+    prefix = STAFF_PREVIEW_PREFIX if staff_preview else ""
     await send(
-        "📅 <b>Запись на консультацию</b>\n\nВыберите формат:",
+        f"{prefix}📅 <b>Запись на консультацию</b>\n\nВыберите формат:",
         parse_mode="HTML",
         reply_markup=b.as_markup(),
     )
@@ -243,20 +254,20 @@ async def _show_service_picker(send, state: FSMContext) -> None:
 
 @router.message(Command("book"))
 async def cmd_book(message: Message, state: FSMContext):
-    await _show_service_picker(message.answer, state)
+    await _show_service_picker(message.answer, state, message.from_user.id)
 
 
 @router.callback_query(F.data == "menu:book")
 async def cb_menu_book(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await _show_service_picker(callback.message.edit_text, state)
+    await _show_service_picker(callback.message.edit_text, state, callback.from_user.id)
     await callback.answer()
 
 
 @router.callback_query(F.data == "book_restart")
 async def cb_book_restart(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await _show_service_picker(callback.message.edit_text, state)
+    await _show_service_picker(callback.message.edit_text, state, callback.from_user.id)
     await callback.answer()
 
 
@@ -520,7 +531,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
             await bot.send_message(
                 recipient_id,
                 f"📅 <b>Новая запись!</b>\n\n"
-                f"👤 {user.first_name} (@{user.username or '—'})\n"
+                f"👤 {html.escape(user.first_name or '')} (@{user.username or '—'})\n"
                 f"🛎 {svc_name} — {svc_price:,} ₽\n"
                 f"📅 {_ru_dt_label(dt)} МСК\n"
                 f"📞 {phone}",
@@ -640,7 +651,7 @@ async def process_leave_request(message: Message, state: FSMContext, bot: Bot):
 
     staff_lines = [
         "📝 <b>Заявка на запись (текст)</b>\n",
-        f"👤 {user.first_name} ({username_label})",
+        f"👤 {html.escape(user.first_name or '')} ({username_label})",
         f"🆔 <code>{user.id}</code>",
     ]
     if svc:

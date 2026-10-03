@@ -27,11 +27,14 @@ def _mock_pool():
     return pool, conn
 
 
-def _make_message(text: str | None = None, contact=None, user_id: int = 777, username: str | None = "client_u"):
+def _make_message(
+    text: str | None = None, contact=None, user_id: int = 777,
+    username: str | None = "client_u", first_name: str = "Клиент",
+):
     msg = MagicMock()
     msg.text = text
     msg.contact = contact
-    msg.from_user = SimpleNamespace(id=user_id, first_name="Клиент", username=username)
+    msg.from_user = SimpleNamespace(id=user_id, first_name=first_name, username=username)
     msg.answer = AsyncMock()
     return msg
 
@@ -291,3 +294,53 @@ async def test_tampered_service_key_in_callback_is_rejected():
     state.clear.assert_awaited_once()
     state.update_data.assert_not_called()
     callback.message.edit_text.assert_not_called()
+
+
+# ── html.escape для first_name в уведомлениях принимающим (ревью 03.10) ────
+
+HOSTILE_NAME = "<b>Анна & Ко</b>"
+
+
+@pytest.mark.asyncio
+async def test_booking_confirmation_notification_escapes_client_name():
+    """Имя клиента с HTML-разметкой не должно пролезть в сообщение сотруднику
+    как настоящая разметка — иначе Telegram вернёт ошибку парсинга или сломает
+    верстку остального сообщения."""
+    state = _make_state({
+        "slot_id": 7,
+        "slot_dt": datetime(2026, 10, 10, 10, 0).isoformat(),
+        "service_key": "consultation",
+        "service_price": 2500,
+    })
+    message = _make_message(text="+7 900 000-00-00", first_name=HOSTILE_NAME)
+    bot = AsyncMock()
+    bot.send_message = AsyncMock(return_value=MagicMock())
+
+    pool, conn = _mock_pool()
+    conn.fetchval = AsyncMock(return_value=42)
+
+    with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
+         patch.object(booking, "build_google_calendar_url", return_value="https://x"), \
+         patch.object(booking, "generate_ics", return_value=b"X"), \
+         patch.object(booking, "BOOKING_RECIPIENT_IDS", [111]), \
+         patch("services.scheduler.schedule_booking_reminders", AsyncMock()):
+        await booking.process_contact(message, state, bot)
+
+    staff_text = bot.send_message.await_args.args[1]
+    assert "<b>Анна & Ко</b>" not in staff_text
+    assert "&lt;b&gt;Анна &amp; Ко&lt;/b&gt;" in staff_text
+
+
+@pytest.mark.asyncio
+async def test_leave_request_notification_escapes_client_name():
+    state = _make_state({})
+    message = _make_message(text="Хочу консультацию", first_name=HOSTILE_NAME)
+    bot = AsyncMock()
+    bot.send_message = AsyncMock(return_value=MagicMock())
+
+    with patch.object(booking, "BOOKING_RECIPIENT_IDS", [111]):
+        await booking.process_leave_request(message, state, bot)
+
+    staff_text = bot.send_message.await_args.args[1]
+    assert "<b>Анна & Ко</b>" not in staff_text
+    assert "&lt;b&gt;Анна &amp; Ко&lt;/b&gt;" in staff_text
