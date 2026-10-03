@@ -121,3 +121,25 @@ async def test_two_staff_rescheduling_different_bookings_to_same_new_slot_only_f
     cb_a.answer.assert_awaited_once()
     assert "Перенесено" in cb_a.answer.await_args.args[0]
     cb_b.answer.assert_awaited_once_with("Этот слот уже занят, выберите другой", show_alert=True)
+
+
+# ── (в) после "Отмена" в заявке — правильная reply-клавиатура ──────────────
+
+@pytest.mark.asyncio
+async def test_leave_request_cancel_restores_main_reply_keyboard():
+    """Одноразовая клавиатура "Поделиться номером" не прячется сама от тапа по
+    инлайн-кнопке "Отмена" (one_time_keyboard реагирует только на использование
+    СЕБЯ/любое сообщение) — после отмены должна явно вернуться обычная
+    клавиатура главного меню."""
+    from handlers.start import MAIN_KEYBOARD
+
+    cb = _make_callback()
+    state = AsyncMock()
+    state.clear = AsyncMock()
+
+    await booking.cb_book_leave_cancel(cb, state)
+
+    state.clear.assert_awaited_once()
+    cb.message.answer.assert_awaited_once()
+    kwargs = cb.message.answer.await_args.kwargs
+    assert kwargs.get("reply_markup") is MAIN_KEYBOARD

@@ -679,6 +679,12 @@ async def cb_book_leave_cancel(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML",
         reply_markup=_booking_coming_soon_keyboard(),
     )
+    # Одноразовая reply-клавиатура "📱 Поделиться номером" (cb_book_leave_request)
+    # не исчезает сама от тапа по ИНЛАЙН-кнопке "Отмена" (one_time_keyboard
+    # прячет клавиатуру только после своего использования/любого сообщения) —
+    # явно возвращаем обычную клавиатуру главного меню бота.
+    from handlers.start import MAIN_KEYBOARD
+    await callback.message.answer("Заявка отменена.", reply_markup=MAIN_KEYBOARD)
     await callback.answer()
 
 
