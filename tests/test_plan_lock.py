@@ -1,7 +1,7 @@
-"""services/plan_lock.py — внешняя (Redis) блокировка plan:confirm, вариант Б
-поверх старого in-process asyncio.Lock (docs/ORCHESTRATOR.md, "известные
-ограничения PR #48": мьютекс в памяти процесса не видит параллельный тап,
-попавший в другой процесс бота).
+"""services/plan_lock.py — блокировка plan:confirm, два слоя: локальный
+asyncio.Lock (защита в пределах процесса, работает всегда) + Redis SET NX EX
+поверх него (защита между процессами, доработка 03.10.2026 по ревью Чата
+ВашСад — см. докстринг модуля plan_lock.py).
 
 Подключения к боевому Redis ЗАПРЕЩЕНЫ — везде fakeredis или моки.
 """
@@ -9,6 +9,7 @@ import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import fakeredis
 import fakeredis.aioredis as fakeredis_aio
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -34,9 +35,9 @@ async def test_acquire_and_release_round_trip():
 
 @pytest.mark.asyncio
 async def test_second_acquire_while_held_raises_busy_not_a_race():
-    """SET NX EX — одна атомарная команда, поэтому это не гонка, а штатный
-    отказ: второй вызов видит занятый ключ сразу же, без отдельного
-    шага "проверить, потом записать"."""
+    """Второй вызов с тем же telegram_id в том же процессе отбивается
+    ЛОКАЛЬНЫМ слоем раньше, чем доходит до Redis (проверка+захват без await
+    между ними — не гонка, не "проверить и записать")."""
     r = _fake_redis()
     async with plan_lock.plan_confirm_lock(222, redis_client=r):
         with pytest.raises(plan_lock.PlanConfirmLockBusy):
@@ -49,6 +50,18 @@ async def test_different_telegram_ids_do_not_block_each_other():
     r = _fake_redis()
     async with plan_lock.plan_confirm_lock(333, redis_client=r), plan_lock.plan_confirm_lock(444, redis_client=r):
         pass  # не бросает PlanConfirmLockBusy — разные ключи
+
+
+@pytest.mark.asyncio
+async def test_redis_key_ttl_is_120_seconds():
+    """TTL выставленного в Redis ключа соответствует PLAN_CONFIRM_LOCK_TTL
+    (120 с — доработка 03.10.2026: запас под таймаут Claude 30 с + save_order
+    + генерация PDF, прежние 45 с были слишком впритык)."""
+    r = _fake_redis()
+    key = "plan_confirm_lock:350"
+    async with plan_lock.plan_confirm_lock(350, redis_client=r):
+        ttl = await r.ttl(key)
+        assert 100 < ttl <= 120, ttl
 
 
 @pytest.mark.asyncio
@@ -123,10 +136,88 @@ async def test_fail_open_on_redis_error_during_release_does_not_raise():
         pass  # release внутри finally не должен поднять исключение
 
 
+# ── Redis недоступен: локальный слой всё равно защищает процесс ────────────
+# (доработка 03.10.2026 по ревью Чата ВашСад: раньше при недоступном Redis
+# защиты от двойного тапа не было вообще — теперь локальный asyncio.Lock
+# работает независимо от Redis.)
+
+@pytest.mark.asyncio
+async def test_no_redis_url_second_parallel_entry_same_process_still_busy():
+    """REDIS_URL не задан (client=None) — локальный замок всё равно отбивает
+    второй параллельный вход того же telegram_id в том же процессе."""
+    with patch.object(plan_lock, "_get_redis_client", return_value=None):
+        async with plan_lock.plan_confirm_lock(1001):
+            with pytest.raises(plan_lock.PlanConfirmLockBusy):
+                async with plan_lock.plan_confirm_lock(1001):
+                    pytest.fail("не должно сюда дойти — локальный замок занят")
+
+
+@pytest.mark.asyncio
+async def test_redis_error_on_set_second_parallel_entry_same_process_still_busy():
+    """Redis бросает RedisError на set (недоступен по сети) — локальный
+    замок всё равно отбивает второй параллельный вход того же telegram_id."""
+    broken_client = AsyncMock()
+    broken_client.set = AsyncMock(side_effect=RedisConnectionError("boom"))
+
+    async with plan_lock.plan_confirm_lock(1002, redis_client=broken_client):
+        with pytest.raises(plan_lock.PlanConfirmLockBusy):
+            async with plan_lock.plan_confirm_lock(1002, redis_client=broken_client):
+                pytest.fail("не должно сюда дойти — локальный замок занят")
+
+
+@pytest.mark.asyncio
+async def test_no_redis_sequential_entries_both_succeed():
+    """Без Redis последовательные (не параллельные) входы одного и того же
+    telegram_id проходят оба — локальный замок освобождается между ними."""
+    with patch.object(plan_lock, "_get_redis_client", return_value=None):
+        async with plan_lock.plan_confirm_lock(1003):
+            pass
+        async with plan_lock.plan_confirm_lock(1003):
+            pass  # без исключения
+
+
+@pytest.mark.asyncio
+async def test_exception_inside_block_releases_local_lock_even_without_redis():
+    """Исключение внутри `async with` не должно оставлять локальный замок
+    захваченным — следующий вход должен пройти."""
+    with patch.object(plan_lock, "_get_redis_client", return_value=None):
+        with pytest.raises(ValueError):
+            async with plan_lock.plan_confirm_lock(1004):
+                raise ValueError("бум")
+        async with plan_lock.plan_confirm_lock(1004):
+            pass  # замок освободился, несмотря на исключение в прошлый раз
+
+
+# ── Два "процесса": локальные замки разные, Redis общий ────────────────────
+
+@pytest.mark.asyncio
+async def test_two_processes_simulation_redis_layer_catches_what_local_layer_cannot():
+    """Два разных экземпляра клиента fakeredis, подключённые к ОДНОМУ
+    серверу (имитация двух процессов бота с общим REDIS_URL). У процесса Б —
+    СВОЙ пустой dict[int, asyncio.Lock] (в реальности это отдельный процесс
+    со своей памятью; здесь эмулируем подменой plan_lock._local_locks на
+    время вызова) — локальный слой его не остановит, но общий Redis должен."""
+    server = fakeredis.FakeServer()
+    client_process_a = fakeredis_aio.FakeRedis(server=server, decode_responses=True)
+    client_process_b = fakeredis_aio.FakeRedis(server=server, decode_responses=True)
+
+    async with plan_lock.plan_confirm_lock(2001, redis_client=client_process_a):
+        with patch.object(plan_lock, "_local_locks", {}):
+            # "Процесс Б" никогда не видел этот telegram_id — у него свой,
+            # отдельный от процесса А, пустой локальный dict; единственное,
+            # что может отбить вход, — общий Redis-ключ.
+            with pytest.raises(plan_lock.PlanConfirmLockBusy):
+                async with plan_lock.plan_confirm_lock(2001, redis_client=client_process_b):
+                    pytest.fail("не должно сюда дойти — Redis-ключ занят процессом А")
+
+
 # ── Константа TTL — зафиксирована, не magic-number на вызове ────────────────
 
 def test_lock_ttl_is_a_short_named_constant():
-    assert 30 <= plan_lock.PLAN_CONFIRM_LOCK_TTL <= 60
+    """120 с (доработка 03.10.2026): дольше таймаута Claude 30 с
+    (services/ai.py, ClientTimeout(total=30)) + save_order + генерация PDF —
+    прежние 45 с были слишком впритык (см. docstring PLAN_CONFIRM_LOCK_TTL)."""
+    assert plan_lock.PLAN_CONFIRM_LOCK_TTL == 120
 
 
 # ── Интеграция с handlers/plan.py: второй тап получает мягкий ответ ────────
