@@ -181,6 +181,15 @@ def _service_by_key(key: str) -> dict | None:
     return next((s for s in BOOKING_SERVICES if s["key"] == key), None)
 
 
+def _slot_status_icon(is_booked: bool, has_client_booking: bool) -> str:
+    """🟢 свободен / 🔴 занят клиентом (есть подтверждённая запись в bookings) /
+    🔒 закрыт сотрудником вручную (is_booked=TRUE, но записи нет) — без новой
+    колонки в схеме различаем через наличие связанной confirmed-записи."""
+    if not is_booked:
+        return "🟢"
+    return "🔴" if has_client_booking else "🔒"
+
+
 def _moscow_now_naive() -> datetime:
     """'Настенное' время Москвы без tzinfo — именно так хранится slot_dt."""
     return datetime.now(MOSCOW_TZ).replace(tzinfo=None)
@@ -670,6 +679,12 @@ async def cb_book_leave_cancel(callback: CallbackQuery, state: FSMContext):
         parse_mode="HTML",
         reply_markup=_booking_coming_soon_keyboard(),
     )
+    # Одноразовая reply-клавиатура "📱 Поделиться номером" (cb_book_leave_request)
+    # не исчезает сама от тапа по ИНЛАЙН-кнопке "Отмена" (one_time_keyboard
+    # прячет клавиатуру только после своего использования/любого сообщения) —
+    # явно возвращаем обычную клавиатуру главного меню бота.
+    from handlers.start import MAIN_KEYBOARD
+    await callback.message.answer("Заявка отменена.", reply_markup=MAIN_KEYBOARD)
     await callback.answer()
 
 
@@ -828,20 +843,31 @@ async def cb_list_slots(callback: CallbackQuery):
         return
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Схема не различает "закрыт сотрудником" и "занят клиентом" отдельной
+        # колонкой (is_booked=TRUE на оба случая) — различаем без миграции:
+        # у занятого клиентом слота есть подтверждённая запись в bookings,
+        # у закрытого сотрудником вручную — нет.
         rows = await conn.fetch(
-            """SELECT slot_dt, is_booked FROM booking_slots
-               WHERE slot_dt > $1 ORDER BY slot_dt LIMIT 14""",
+            """SELECT s.slot_dt, s.is_booked,
+                      EXISTS(
+                          SELECT 1 FROM bookings b
+                          WHERE b.slot_id = s.id AND b.status = 'confirmed'
+                      ) AS has_client_booking
+               FROM booking_slots s
+               WHERE s.slot_dt > $1 ORDER BY s.slot_dt LIMIT 14""",
             _moscow_now_naive(),
         )
     if not rows:
         await callback.answer("Слотов нет", show_alert=True)
         return
     lines = [
-        f"{'✅' if r['is_booked'] else '🟢'} {_ru_dt_label_short(r['slot_dt'])} МСК"
+        f"{_slot_status_icon(r['is_booked'], r['has_client_booking'])} "
+        f"{_ru_dt_label_short(r['slot_dt'])} МСК"
         for r in rows
     ]
     await callback.message.answer(
-        "📅 <b>Слоты (ближайшие 14):</b>\n\n" + "\n".join(lines),
+        "📅 <b>Слоты (ближайшие 14):</b>\n\n" + "\n".join(lines)
+        + "\n\n🟢 свободен · 🔴 занят клиентом · 🔒 закрыт вручную",
         parse_mode="HTML",
     )
     await callback.answer()
