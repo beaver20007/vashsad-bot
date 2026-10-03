@@ -19,6 +19,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import DESIGNER_TELEGRAM_ID
 from services.content_texts import DEFAULT_QUALIFICATION_LINE, get_designer_qualification_line
 from services.database import get_pool
+from services.pdf_generator import PDF_FONT, PDF_FONT_BOLD
+from services.pdf_generator import _ensure_fonts as _ensure_pdf_fonts
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -206,11 +208,14 @@ async def cmd_export_clients(message: Message):
 
 
 def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_LINE) -> bytes:
+    """Бросает PdfFontError, если шрифт с кириллицей недоступен (см. services/pdf_generator._ensure_fonts)."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+
+    _ensure_pdf_fonts()
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -222,17 +227,18 @@ def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_L
 
     styles = getSampleStyleSheet()
     title_style  = ParagraphStyle("fav_title", parent=styles["Normal"],
-                                  fontSize=20, textColor=SAGE, spaceAfter=4, fontName="Helvetica-Bold")
+                                  fontSize=20, textColor=SAGE, spaceAfter=4, fontName=PDF_FONT_BOLD)
     sub_style    = ParagraphStyle("fav_sub", parent=styles["Normal"],
-                                  fontSize=10, textColor=colors.grey, spaceAfter=16)
+                                  fontSize=10, textColor=colors.grey, spaceAfter=16, fontName=PDF_FONT)
     plant_name_s = ParagraphStyle("plant_name", parent=styles["Normal"],
-                                  fontSize=13, textColor=SAGE, fontName="Helvetica-Bold", spaceAfter=2)
+                                  fontSize=13, textColor=SAGE, fontName=PDF_FONT_BOLD, spaceAfter=2)
     latin_style  = ParagraphStyle("latin", parent=styles["Normal"],
-                                  fontSize=10, textColor=EARTH, spaceAfter=4, fontName="Helvetica-Oblique")
+                                  fontSize=10, textColor=EARTH, spaceAfter=4, fontName=PDF_FONT)
     care_style   = ParagraphStyle("care", parent=styles["Normal"],
-                                  fontSize=9, textColor=colors.HexColor("#333333"), leading=13, spaceAfter=8)
+                                  fontSize=9, textColor=colors.HexColor("#333333"), leading=13, spaceAfter=8,
+                                  fontName=PDF_FONT)
     footer_style = ParagraphStyle("footer", parent=styles["Normal"],
-                                  fontSize=8, textColor=colors.grey, spaceBefore=20)
+                                  fontSize=8, textColor=colors.grey, spaceBefore=20, fontName=PDF_FONT)
 
     elems = []
     elems.append(Paragraph("Мои растения — ВашСад", title_style))
@@ -256,7 +262,10 @@ def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_L
         if added_at:
             elems.append(Paragraph(
                 f"Добавлено: {added_at.strftime('%d.%m.%Y') if hasattr(added_at, 'strftime') else str(added_at)}",
-                ParagraphStyle("date", parent=styles["Normal"], fontSize=8, textColor=colors.grey, spaceAfter=6),
+                ParagraphStyle(
+                    "date", parent=styles["Normal"], fontSize=8, textColor=colors.grey,
+                    spaceAfter=6, fontName=PDF_FONT,
+                ),
             ))
         elems.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#D4CEC5"), spaceAfter=10))
 
@@ -271,12 +280,15 @@ def _build_favorites_pdf(rows, qualification_line: str = DEFAULT_QUALIFICATION_L
 
 
 def _build_pdf(rows, period_label: str) -> bytes:
+    """Бросает PdfFontError, если шрифт с кириллицей недоступен (см. services/pdf_generator._ensure_fonts)."""
 
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    _ensure_pdf_fonts()
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -288,10 +300,10 @@ def _build_pdf(rows, period_label: str) -> bytes:
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("title", parent=styles["Normal"],
-                                 fontSize=18, textColor=SAGE, spaceAfter=6, fontName="Helvetica-Bold")
+                                 fontSize=18, textColor=SAGE, spaceAfter=6, fontName=PDF_FONT_BOLD)
     sub_style   = ParagraphStyle("sub", parent=styles["Normal"],
-                                 fontSize=10, textColor=colors.grey, spaceAfter=12)
-    cell_style  = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
+                                 fontSize=10, textColor=colors.grey, spaceAfter=12, fontName=PDF_FONT)
+    cell_style  = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10, fontName=PDF_FONT)
 
     STATUS_RU = {
         "new": "Новая", "in_progress": "В работе",
@@ -303,7 +315,7 @@ def _build_pdf(rows, period_label: str) -> bytes:
     elems.append(Paragraph(f"Период: {period_label}  ·  Всего заявок: {len(rows)}  ·  Дата: {datetime.now().strftime('%d.%m.%Y')}", sub_style))
 
     if not rows:
-        elems.append(Paragraph("Заявок за этот период нет.", styles["Normal"]))
+        elems.append(Paragraph("Заявок за этот период нет.", sub_style))
         doc.build(elems)
         return buf.getvalue()
 
@@ -329,7 +341,8 @@ def _build_pdf(rows, period_label: str) -> bytes:
     tbl.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,0), SAGE),
         ("TEXTCOLOR",  (0,0), (-1,0), colors.white),
-        ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTNAME",   (0,0), (-1,0), PDF_FONT_BOLD),
+        ("FONTNAME",   (0,1), (-1,-1), PDF_FONT),
         ("FONTSIZE",   (0,0), (-1,0), 8),
         ("FONTSIZE",   (0,1), (-1,-1), 7),
         ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, CREAM]),
