@@ -36,6 +36,10 @@ def _make_message(text: str | None, user_id: int = 100000001) -> MagicMock:
 def _mock_pool():
     pool = MagicMock()
     conn = AsyncMock()
+    conn.transaction = MagicMock(return_value=AsyncMock(
+        __aenter__=AsyncMock(return_value=None),
+        __aexit__=AsyncMock(return_value=False),
+    ))
     pool.acquire = MagicMock(return_value=AsyncMock(
         __aenter__=AsyncMock(return_value=conn),
         __aexit__=AsyncMock(return_value=False),
@@ -255,8 +259,9 @@ async def test_full_data_still_creates_booking_as_before():
     message = _make_message(CLIENT_PHONE)
     bot = AsyncMock()
     pool, conn = _mock_pool()
-    conn.fetchval = AsyncMock(return_value=99)
-    conn.fetchrow = AsyncMock(return_value={"id": 7})  # слот свободен (проверка перед INSERT)
+    # Слот захватывается атомарным UPDATE ... RETURNING id (conn.fetchval);
+    # id=7 возвращается и на захват слота, и на INSERT ... RETURNING id.
+    conn.fetchval = AsyncMock(return_value=7)
 
     with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
          patch.object(booking, "build_google_calendar_url", return_value="https://calendar.google.com/x"), \
@@ -264,18 +269,18 @@ async def test_full_data_still_creates_booking_as_before():
          patch("services.scheduler.schedule_booking_reminders", AsyncMock()):
         await booking.process_contact(message, state, bot)
 
-    conn.fetchval.assert_awaited_once()  # INSERT ... RETURNING id
-    insert_call = conn.fetchval.await_args_list[0]
+    assert conn.fetchval.await_count == 2  # захват слота + INSERT ... RETURNING id
+    claim_call, insert_call = conn.fetchval.await_args_list
+    assert "UPDATE booking_slots" in claim_call.args[0] and "is_booked=FALSE" in claim_call.args[0]
     assert "INSERT INTO bookings" in insert_call.args[0]
     assert insert_call.args[1:] == (
         message.from_user.id, 7, "consultation", "Онлайн-консультация 60 мин", 2500, CLIENT_PHONE,
     )
 
-    conn.execute.assert_awaited_once()  # UPDATE booking_slots SET is_booked=TRUE
-    update_call = conn.execute.await_args_list[0]
-    assert "UPDATE booking_slots" in update_call.args[0]
+    conn.execute.assert_not_called()  # захват слота теперь через fetchval, не execute
 
-    message.answer.assert_awaited_once()
-    confirm_text = message.answer.await_args.args[0]
+    # Первое сообщение — "Номер получен" с ReplyKeyboardRemove, второе — подтверждение записи.
+    assert message.answer.await_count == 2
+    confirm_text = message.answer.await_args_list[1].args[0]
     assert "Запись подтверждена" in confirm_text
     state.clear.assert_awaited_once()

@@ -19,6 +19,7 @@ from config import (
     MINI_APP_URL,
 )
 from services import bot_texts
+from services.booking_format import ru_dt_label
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
 
@@ -95,7 +96,23 @@ async def notify_garden_tasks(bot: Bot) -> None:
     log.info("Уведомления о задачах: отправлено %d, ошибок %d", sent, failed)
 
 
-async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int, slot_dt: datetime) -> None:
+def _cancel_job(job_id: str) -> None:
+    import contextlib
+
+    from apscheduler.jobstores.base import JobLookupError
+    with contextlib.suppress(JobLookupError):
+        _scheduler_instance.remove_job(job_id)
+
+
+def cancel_booking_reminders(booking_id: int) -> None:
+    """Снимает запланированные напоминания о записи (отмена клиентом/сотрудником,
+    перенос — старые джобы больше не нужны). Отсутствие джобы (уже сработала или
+    никогда не ставилась) — не ошибка."""
+    _cancel_job(f"booking_remind_24h_{booking_id}")
+    _cancel_job(f"booking_remind_1h_{booking_id}")
+
+
+async def schedule_booking_reminders(bot: Bot, booking_id: int, slot_dt: datetime) -> None:
     """Планирует напоминания за 24ч и 1ч до консультации.
 
     slot_dt — наивный datetime, трактуется как московское настенное время
@@ -104,7 +121,11 @@ async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int
     datetime.now() (контейнер работает в UTC — сравнение с UTC-naive "сейчас"
     против MSK-naive remind_* было бы рассинхронизировано на 3 часа). Сам
     run_date тоже передаём с явным timezone=MOSCOW_TZ — не полагаемся на то,
-    что это совпадёт с дефолтным поясом планировщика где-то ещё."""
+    что это совпадёт с дефолтным поясом планировщика где-то ещё.
+
+    Джоба получает только booking_id — telegram_id и актуальный статус/время
+    она сама перечитывает из БД в момент срабатывания (см. _send_booking_reminder),
+    чтобы отменённая/перенесённая запись не долетела напоминанием."""
     remind_24h = slot_dt - timedelta(hours=24)
     remind_1h  = slot_dt - timedelta(hours=1)
     now = datetime.now(MOSCOW_TZ).replace(tzinfo=None)
@@ -114,7 +135,7 @@ async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int
             _send_booking_reminder, "date",
             run_date=remind_24h,
             timezone=MOSCOW_TZ,
-            args=[bot, telegram_id, slot_dt, "24h"],
+            args=[bot, booking_id, slot_dt, "24h"],
             id=f"booking_remind_24h_{booking_id}",
             replace_existing=True,
         )
@@ -123,28 +144,72 @@ async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int
             _send_booking_reminder, "date",
             run_date=remind_1h,
             timezone=MOSCOW_TZ,
-            args=[bot, telegram_id, slot_dt, "1h"],
+            args=[bot, booking_id, slot_dt, "1h"],
             id=f"booking_remind_1h_{booking_id}",
             replace_existing=True,
         )
     log.info("Напоминания о записи #%s запланированы", booking_id)
 
 
-async def _send_booking_reminder(bot: Bot, telegram_id: int, slot_dt: datetime, kind: str) -> None:
+async def _send_booking_reminder(bot: Bot, booking_id: int, scheduled_slot_dt: datetime, kind: str) -> None:
+    """Перед отправкой перечитывает статус записи и актуальное время слота из БД:
+    отправляет только если запись всё ещё confirmed И текущий slot_dt совпадает с
+    тем, под который джоба была поставлена (иначе это устаревшая джоба отменённой
+    или перенесённой записи — молча выходим, без ошибки)."""
     from aiogram.exceptions import TelegramForbiddenError
+
+    from services.database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT b.telegram_id, b.status, s.slot_dt
+               FROM bookings b JOIN booking_slots s ON s.id = b.slot_id
+               WHERE b.id = $1""",
+            booking_id,
+        )
+    if not row or row["status"] != "confirmed" or row["slot_dt"] != scheduled_slot_dt:
+        log.info(
+            "Напоминание #%s (%s) не отправлено: запись больше не confirmed/время изменилось",
+            booking_id, kind,
+        )
+        return
+
     label = "24 часа" if kind == "24h" else "1 час"
     text = (
         f"⏰ <b>Напоминание о консультации</b>\n\n"
         f"До встречи с дизайнером осталось <b>{label}</b>!\n"
-        f"📅 {slot_dt.strftime('%d %b в %H:%M')}\n\n"
+        f"📅 {ru_dt_label(row['slot_dt'])}\n\n"
         f"Подготовьте фото участка и список вопросов 🌿"
     )
     try:
-        await bot.send_message(telegram_id, text, parse_mode="HTML")
+        await bot.send_message(row["telegram_id"], text, parse_mode="HTML")
     except TelegramForbiddenError:
         pass
     except Exception as e:
-        log.warning("Reminder error for %s: %s", telegram_id, e)
+        log.warning("Reminder error for booking #%s: %s", booking_id, e)
+
+
+async def reschedule_all_booking_reminders(bot: Bot) -> None:
+    """Вызывается при старте бота: джобы APScheduler не переживают рестарт
+    процесса, поэтому напоминания всех будущих confirmed-записей надо
+    перепланировать заново из БД."""
+    from services.database import get_pool
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT b.id, s.slot_dt FROM bookings b
+                   JOIN booking_slots s ON s.id = b.slot_id
+                   WHERE b.status = 'confirmed' AND s.slot_dt > $1""",
+                datetime.now(MOSCOW_TZ).replace(tzinfo=None),
+            )
+    except Exception as e:
+        log.error("reschedule_all_booking_reminders: не удалось прочитать записи из БД: %s", e)
+        return
+
+    for row in rows:
+        await schedule_booking_reminders(bot, row["id"], row["slot_dt"])
+    log.info("Перепланированы напоминания для %d будущих записей", len(rows))
 
 
 async def schedule_nps(bot: Bot, telegram_id: int, order_id: int) -> None:

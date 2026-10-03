@@ -7,6 +7,7 @@
 См. docs/ORCHESTRATOR.md, запись "fix/fsm-data-ttl-margin"-смежная по духу, и запись
 этого трека.
 """
+import html
 import logging
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -23,6 +24,7 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -38,6 +40,7 @@ from config import (
     DESIGNER_TELEGRAM_ID,
     DESIGNER_TELEGRAM_ID_2,
 )
+from services.booking_format import ru_day_label, ru_dt_label, ru_dt_label_short
 from services.calendar_service import build_google_calendar_url, generate_ics
 from services.database import get_pool
 
@@ -61,6 +64,12 @@ class BookingForm(StatesGroup):
     waiting_slot          = State()
     waiting_phone_consent = State()
     waiting_contact       = State()
+
+
+class BookingRequest(StatesGroup):
+    """Свободная заявка, когда слотов нет/запись не открыта — отдельная ветка
+    от BookingForm, не требует выбора слота."""
+    waiting_text = State()
 
 
 # Обязательные поля анкеты записи к моменту ввода телефона (process_contact).
@@ -127,6 +136,17 @@ def _missing_booking_fields(data: dict) -> list[str]:
     return [f for f in BOOKING_REQUIRED_FIELDS if data.get(f) in (None, "")]
 
 
+def _own_contact_phone(message: Message) -> str | None:
+    """Номер из message.contact, только если контакт принадлежит самому
+    отправителю (пересланная чужая визитка не считается номером клиента)."""
+    contact = message.contact
+    if contact is None:
+        return None
+    if contact.user_id and contact.user_id != message.from_user.id:
+        return None
+    return contact.phone_number
+
+
 def _service_by_key(key: str) -> dict | None:
     return next((s for s in BOOKING_SERVICES if s["key"] == key), None)
 
@@ -136,20 +156,11 @@ def _moscow_now_naive() -> datetime:
     return datetime.now(MOSCOW_TZ).replace(tzinfo=None)
 
 
-def _ru_dt_label(dt: datetime) -> str:
-    months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
-    return f"{dt.day} {months[dt.month - 1]} в {dt.strftime('%H:%M')}"
-
-
-def _ru_dt_label_short(dt: datetime) -> str:
-    months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
-    return f"{dt.day} {months[dt.month - 1]} {dt.strftime('%H:%M')}"
-
-
-def _ru_day_label(d: date) -> str:
-    weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-    months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
-    return f"{weekdays[d.weekday()]}, {d.day} {months[d.month - 1]}"
+# Форматирование дат вынесено в services/booking_format.py — его же использует
+# services/scheduler.py (напоминания), без циклического импорта между модулями.
+_ru_dt_label = ru_dt_label
+_ru_dt_label_short = ru_dt_label_short
+_ru_day_label = ru_day_label
 
 
 async def _get_free_slots(days_ahead: int = 14) -> list[dict]:
@@ -219,7 +230,7 @@ async def _show_service_picker(send, state: FSMContext) -> None:
         price_label = f"{svc['price']:,}".replace(",", " ")
         b.row(InlineKeyboardButton(
             text=f"{svc['label']} — {price_label} ₽ ({svc['duration_min']} мин)",
-            callback_data=f"book_svc:{svc['key']}:{svc['price']}",
+            callback_data=f"book_svc:{svc['key']}",
         ))
     b.row(InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main"))
     await send(
@@ -253,8 +264,15 @@ async def cb_book_restart(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(BookingForm.waiting_service, F.data.startswith("book_svc:"))
 async def cb_book_service(callback: CallbackQuery, state: FSMContext):
-    _, key, price = callback.data.split(":")
-    await state.update_data(service_key=key, service_price=int(price))
+    key = callback.data.split(":", 1)[1]
+    svc = _service_by_key(key)
+    if not svc:
+        # Неизвестный/подделанный ключ формата — цена больше не идёт в
+        # callback_data именно для защиты от подмены (см. брифа трек 4).
+        await callback.answer("Формат недоступен", show_alert=True)
+        await state.clear()
+        return
+    await state.update_data(service_key=key, service_price=svc["price"])
 
     slots = await _get_free_slots()
     if not slots:
@@ -371,13 +389,8 @@ async def cb_book_phone_consent(callback: CallbackQuery, state: FSMContext):
 @router.message(BookingForm.waiting_contact)
 async def process_contact(message: Message, state: FSMContext, bot: Bot):
     # Кнопка "Поделиться номером" шлёт message.contact; запасной путь — текст.
-    # Контакт обязательно должен принадлежать самому отправителю (Telegram это
-    # гарантирует для кнопки request_contact, но на всякий случай проверяем —
-    # пересланная чужая визитка не должна пройти как "номер клиента").
-    contact = message.contact
-    if contact is not None and contact.user_id and contact.user_id != message.from_user.id:
-        contact = None
-    phone = (contact.phone_number if contact else (message.text or "")).strip()
+    own_phone = _own_contact_phone(message)
+    phone = (own_phone if own_phone else (message.text or "")).strip()
 
     data = await state.get_data()
 
@@ -410,25 +423,33 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     duration_h = duration_min / 60
 
     pool = await get_pool()
-    async with pool.acquire() as conn:
-        slot_row = await conn.fetchrow(
-            "SELECT id FROM booking_slots WHERE id=$1 AND is_booked=FALSE", slot_id,
+    booking_id = None
+    async with pool.acquire() as conn, conn.transaction():
+        # Атомарный захват слота: пустой результат -> слот уже заняли
+        # (кто-то успел раньше), пока клиент вводил номер.
+        claimed_id = await conn.fetchval(
+            "UPDATE booking_slots SET is_booked=TRUE WHERE id=$1 AND is_booked=FALSE RETURNING id",
+            slot_id,
         )
-        if not slot_row:
-            await message.answer(
-                "😔 Этот слот уже заняли, пока вы вводили номер. Пожалуйста, выберите другое время.",
-                parse_mode="HTML",
-                reply_markup=_booking_restart_keyboard(),
+        if claimed_id is not None:
+            booking_id = await conn.fetchval(
+                """INSERT INTO bookings (telegram_id, slot_id, service_key, service_name, service_price, phone)
+                   VALUES ($1,$2,$3,$4,$5,$6) RETURNING id""",
+                message.from_user.id, slot_id, svc_key, svc_name, svc_price, phone,
             )
-            await state.clear()
-            return
 
-        booking_id = await conn.fetchval(
-            """INSERT INTO bookings (telegram_id, slot_id, service_key, service_name, service_price, phone)
-               VALUES ($1,$2,$3,$4,$5,$6) RETURNING id""",
-            message.from_user.id, slot_id, svc_key, svc_name, svc_price, phone,
+    if booking_id is None:
+        await message.answer(
+            "😔 Этот слот уже заняли, пока вы вводили номер. Пожалуйста, выберите другое время.",
+            parse_mode="HTML",
+            reply_markup=_booking_restart_keyboard(),
         )
-        await conn.execute("UPDATE booking_slots SET is_booked=TRUE WHERE id=$1", slot_id)
+        await state.clear()
+        return
+
+    # Reply-keyboard "Поделиться номером" была показана независимо от того,
+    # пришёл телефон кнопкой или текстом — убираем её явно перед подтверждением.
+    await message.answer("Номер получен ✅", reply_markup=ReplyKeyboardRemove())
 
     dt = datetime.fromisoformat(slot_dt)
 
@@ -484,7 +505,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
     # модуля): не полагаемся на дефолтный timezone планировщика неявно.
     try:
         from services.scheduler import schedule_booking_reminders
-        await schedule_booking_reminders(bot, message.from_user.id, booking_id, dt)
+        await schedule_booking_reminders(bot, booking_id, dt)
     except Exception as e:
         log.warning("Ошибка планирования напоминаний: %s", e)
 
@@ -516,7 +537,7 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
 async def cb_book_cancel(callback: CallbackQuery, bot: Bot):
     booking_id = int(callback.data.split(":")[1])
     pool = await get_pool()
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             "SELECT telegram_id, slot_id, service_name FROM bookings WHERE id=$1 AND status='confirmed'",
             booking_id,
@@ -529,6 +550,9 @@ async def cb_book_cancel(callback: CallbackQuery, bot: Bot):
             return
         await conn.execute("UPDATE bookings SET status='cancelled' WHERE id=$1", booking_id)
         await conn.execute("UPDATE booking_slots SET is_booked=FALSE WHERE id=$1", row["slot_id"])
+
+    from services.scheduler import cancel_booking_reminders
+    cancel_booking_reminders(booking_id)
 
     await callback.message.edit_text(
         "❌ Запись отменена. Будем рады видеть вас снова!",
@@ -550,38 +574,98 @@ async def cb_book_cancel(callback: CallbackQuery, bot: Bot):
     await callback.answer()
 
 
+LEAVE_REQUEST_PROMPT_TEXT = (
+    "📝 Напишите одним сообщением, что хотите обсудить и когда вам удобно. "
+    "Можно оставить телефон."
+)
+
+LEAVE_REQUEST_RETRY_TEXT = (
+    "📝 Пожалуйста, напишите текстом, что вас интересует, или поделитесь "
+    "номером кнопкой ниже."
+)
+
+
+def _leave_request_cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardBuilder().row(
+        InlineKeyboardButton(text="◀️ Отмена", callback_data="book_leave_cancel"),
+    ).as_markup()
+
+
 @router.callback_query(F.data == "book_leave_request")
-async def cb_book_leave_request(callback: CallbackQuery, state: FSMContext, bot: Bot):
-    """Нет слотов / запись ещё не открыта — сохраняем заявку только как уведомление
-    принимающим, без новой таблицы (решение по брифу: если можно обойтись без схемы —
-    обойтись)."""
+async def cb_book_leave_request(callback: CallbackQuery, state: FSMContext):
+    """Нет слотов / запись ещё не открыта — свободная заявка (без новой таблицы,
+    решение по брифу: если можно обойтись без схемы — обойтись); сохраняем
+    service_key в data, если клиент успел его выбрать."""
+    await callback.message.edit_text(
+        LEAVE_REQUEST_PROMPT_TEXT, parse_mode="HTML", reply_markup=_leave_request_cancel_keyboard(),
+    )
+    await callback.message.answer(
+        "Нажмите кнопку ниже, чтобы поделиться номером, или напишите сообщение текстом.",
+        reply_markup=_phone_entry_keyboard(),
+    )
+    await state.set_state(BookingRequest.waiting_text)
+    await callback.answer()
+
+
+@router.callback_query(BookingRequest.waiting_text, F.data == "book_leave_cancel")
+async def cb_book_leave_cancel(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        BOOKING_COMING_SOON_TEXT if not BOOKING_OPEN_FOR_CLIENTS else BOOKING_NO_SLOTS_TEXT,
+        parse_mode="HTML",
+        reply_markup=_booking_coming_soon_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.message(BookingRequest.waiting_text)
+async def process_leave_request(message: Message, state: FSMContext, bot: Bot):
+    phone = _own_contact_phone(message)
+    client_text = "" if phone else (message.text or "").strip()[:1000]
+
+    if not phone and not client_text:
+        await message.answer(
+            LEAVE_REQUEST_RETRY_TEXT, parse_mode="HTML", reply_markup=_phone_entry_keyboard(),
+        )
+        return
+
+    # Reply-keyboard "Поделиться номером" была показана в любом случае —
+    # убираем её явно перед подтверждением (как и в основном сценарии записи).
+    await message.answer("Информация получена ✅", reply_markup=ReplyKeyboardRemove())
+
     data = await state.get_data()
     svc = _service_by_key(data.get("service_key", ""))
-    user = callback.from_user
+    user = message.from_user
+    username_label = f"@{user.username}" if user.username else "нет username"
 
-    text = (
-        "📝 <b>Заявка на запись</b>\n\n"
-        f"👤 {user.first_name} (@{user.username or '—'})\n"
-        + (f"🛎 Формат: {svc['label']}\n" if svc else "🛎 Формат: не указан (клиент пока не выбирал)\n")
-    )
+    staff_lines = [
+        "📝 <b>Заявка на запись (текст)</b>\n",
+        f"👤 {user.first_name} ({username_label})",
+        f"🆔 <code>{user.id}</code>",
+    ]
+    if svc:
+        staff_lines.append(f"🛎 Формат: {svc['label']}")
+    if client_text:
+        staff_lines.append(f"💬 {html.escape(client_text)}")
+    if phone:
+        staff_lines.append(f"📞 {phone}")
+    staff_text = "\n".join(staff_lines)
+
     kb = InlineKeyboardBuilder()
-    if user.username:
-        kb.row(InlineKeyboardButton(text="✉️ Написать клиенту", url=f"https://t.me/{user.username}"))
+    contact_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
+    kb.row(InlineKeyboardButton(text="✉️ Написать клиенту", url=contact_url))
 
     sent_any = False
     for recipient_id in _booking_recipient_ids():
         try:
-            await bot.send_message(
-                recipient_id, text, parse_mode="HTML",
-                reply_markup=kb.as_markup() if user.username else None,
-            )
+            await bot.send_message(recipient_id, staff_text, parse_mode="HTML", reply_markup=kb.as_markup())
             sent_any = True
         except Exception as e:
-            log.warning("Уведомление о заявке получателю %s: %s", recipient_id, e)
+            log.warning("Уведомление о заявке (текст) получателю %s: %s", recipient_id, e)
 
     await state.clear()
     if sent_any:
-        await callback.message.edit_text(
+        await message.answer(
             "✅ Заявка принята! Мы свяжемся с вами, чтобы подобрать время.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardBuilder().row(
@@ -589,13 +673,12 @@ async def cb_book_leave_request(callback: CallbackQuery, state: FSMContext, bot:
             ).as_markup(),
         )
     else:
-        log.error("book_leave_request: ни одному получателю не удалось отправить заявку (user_id=%s)", user.id)
-        await callback.message.edit_text(
+        log.error("process_leave_request: ни одному получателю не удалось отправить заявку (user_id=%s)", user.id)
+        await message.answer(
             "😔 Не получилось отправить заявку. Пожалуйста, напишите нам напрямую.",
             parse_mode="HTML",
             reply_markup=_booking_coming_soon_keyboard(),
         )
-    await callback.answer()
 
 
 # ── Создание слотов (переиспользуется ручной кнопкой и автогенерацией) ────
@@ -857,7 +940,7 @@ async def cb_badm_cancel(callback: CallbackQuery, bot: Bot):
         return
     booking_id = int(callback.data.split(":")[1])
     pool = await get_pool()
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             "SELECT telegram_id, slot_id FROM bookings WHERE id=$1 AND status='confirmed'", booking_id,
         )
@@ -866,6 +949,9 @@ async def cb_badm_cancel(callback: CallbackQuery, bot: Bot):
             return
         await conn.execute("UPDATE bookings SET status='cancelled' WHERE id=$1", booking_id)
         await conn.execute("UPDATE booking_slots SET is_booked=FALSE WHERE id=$1", row["slot_id"])
+
+    from services.scheduler import cancel_booking_reminders
+    cancel_booking_reminders(booking_id)
     try:
         await bot.send_message(
             row["telegram_id"],
@@ -925,7 +1011,10 @@ async def cb_badm_resched_pick(callback: CallbackQuery, bot: Bot):
     booking_id, new_slot_id = int(booking_id_s), int(new_slot_id_s)
 
     pool = await get_pool()
-    async with pool.acquire() as conn:
+    new_booking_id = None
+    new_dt = None
+    old_telegram_id = None
+    async with pool.acquire() as conn, conn.transaction():
         old = await conn.fetchrow(
             """SELECT telegram_id, slot_id, service_key, service_name, service_price, phone
                FROM bookings WHERE id=$1 AND status='confirmed'""",
@@ -934,12 +1023,17 @@ async def cb_badm_resched_pick(callback: CallbackQuery, bot: Bot):
         if not old:
             await callback.answer("Запись уже недоступна", show_alert=True)
             return
-        new_slot = await conn.fetchrow(
-            "SELECT slot_dt FROM booking_slots WHERE id=$1 AND is_booked=FALSE", new_slot_id,
+
+        # Атомарный захват нового слота: пустой результат -> его успели
+        # занять, пока сотрудник выбирал время переноса.
+        claimed_id = await conn.fetchval(
+            "UPDATE booking_slots SET is_booked=TRUE WHERE id=$1 AND is_booked=FALSE RETURNING id",
+            new_slot_id,
         )
-        if not new_slot:
+        if claimed_id is None:
             await callback.answer("Этот слот уже занят, выберите другой", show_alert=True)
             return
+        new_dt = await conn.fetchval("SELECT slot_dt FROM booking_slots WHERE id=$1", new_slot_id)
 
         await conn.execute("UPDATE bookings SET status='rescheduled' WHERE id=$1", booking_id)
         await conn.execute("UPDATE booking_slots SET is_booked=FALSE WHERE id=$1", old["slot_id"])
@@ -949,12 +1043,18 @@ async def cb_badm_resched_pick(callback: CallbackQuery, bot: Bot):
             old["telegram_id"], new_slot_id, old["service_key"], old["service_name"],
             old["service_price"], old["phone"],
         )
-        await conn.execute("UPDATE booking_slots SET is_booked=TRUE WHERE id=$1", new_slot_id)
+        old_telegram_id = old["telegram_id"]
 
-    new_dt: datetime = new_slot["slot_dt"]
+    from services.scheduler import cancel_booking_reminders, schedule_booking_reminders
+    cancel_booking_reminders(booking_id)
+    try:
+        await schedule_booking_reminders(bot, new_booking_id, new_dt)
+    except Exception as e:
+        log.warning("Ошибка планирования напоминаний после переноса (booking_id=%s): %s", new_booking_id, e)
+
     try:
         await bot.send_message(
-            old["telegram_id"],
+            old_telegram_id,
             f"🔁 Ваша запись перенесена на {_ru_dt_label(new_dt)} МСК.",
         )
     except Exception as e:
