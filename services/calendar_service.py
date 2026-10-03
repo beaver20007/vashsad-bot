@@ -1,6 +1,20 @@
 """Генерация ICS-файлов и ссылок Google Calendar для записей на консультацию."""
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
+
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
+
+
+def _to_utc(start_dt: datetime) -> datetime:
+    """Наивный start_dt трактуется как московское 'настенное' время (см.
+    handlers/booking.py и docs/ORCHESTRATOR.md, трек часового пояса от
+    2026-10-03) — НЕ как UTC, как было раньше: прежняя трактовка расходилась
+    и с тем, что видел клиент в чате (просто "10:00"), и с APScheduler,
+    который планирует напоминания явно в Europe/Moscow."""
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=MOSCOW_TZ)
+    return start_dt.astimezone(UTC)
 
 
 def generate_ics(
@@ -15,7 +29,8 @@ def generate_ics(
 
     Args:
         title: Заголовок события.
-        start_dt: Дата и время начала (naive — трактуется как UTC, или aware).
+        start_dt: Дата и время начала (naive — трактуется как московское
+            настенное время, Europe/Moscow; или aware — тогда берётся как есть).
         duration_hours: Продолжительность в часах.
         location: Место проведения.
         description: Описание события.
@@ -24,8 +39,7 @@ def generate_ics(
     Returns:
         Байты ICS-файла.
     """
-    # Нормализуем к UTC
-    start_utc = start_dt.replace(tzinfo=UTC) if start_dt.tzinfo is None else start_dt.astimezone(UTC)
+    start_utc = _to_utc(start_dt)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 
@@ -68,7 +82,8 @@ def build_google_calendar_url(
 
     Args:
         title: Заголовок события.
-        start_dt: Дата и время начала (naive — трактуется как UTC, или aware).
+        start_dt: Дата и время начала (naive — трактуется как московское
+            настенное время, Europe/Moscow; или aware — тогда берётся как есть).
         duration_hours: Продолжительность в часах.
         location: Место проведения.
         description: Описание события.
@@ -76,7 +91,7 @@ def build_google_calendar_url(
     Returns:
         URL для Google Calendar.
     """
-    start_utc = start_dt.replace(tzinfo=UTC) if start_dt.tzinfo is None else start_dt.astimezone(UTC)
+    start_utc = _to_utc(start_dt)
 
     end_utc = start_utc + timedelta(hours=duration_hours)
 

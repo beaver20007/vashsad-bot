@@ -138,13 +138,13 @@ async def _send_welcome(target, telegram_id: int, user) -> None:
         await target.answer_photo(
             photo=WELCOME_IMAGE_URL,
             caption=caption,
-            reply_markup=mini_app_keyboard(),
+            reply_markup=mini_app_keyboard(telegram_id),
             parse_mode="HTML",
         )
     else:
         await target.answer(
             caption,
-            reply_markup=mini_app_keyboard(),
+            reply_markup=mini_app_keyboard(telegram_id),
             parse_mode="HTML",
         )
     await target.answer(
@@ -153,8 +153,11 @@ async def _send_welcome(target, telegram_id: int, user) -> None:
     )
 
 
-def mini_app_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка открытия Mini App + основное меню."""
+def mini_app_keyboard(telegram_id: int | None = None) -> InlineKeyboardMarkup:
+    """Кнопка открытия Mini App + основное меню.
+    telegram_id — если передан и входит в доступ сотрудников записи
+    (handlers.booking._is_booking_staff), добавляет кнопку «⚙️ Управление
+    записью» (брифa 03.10.2026: кнопка видна только им)."""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
@@ -174,6 +177,11 @@ def mini_app_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💰 Прайс",           callback_data="menu:price"),
         InlineKeyboardButton(text="💬 AI-чат",          callback_data="menu:chat"),
     )
+    builder.row(InlineKeyboardButton(text="📅 Записаться на консультацию", callback_data="menu:book"))
+    if telegram_id is not None:
+        from handlers.booking import _is_booking_staff
+        if _is_booking_staff(telegram_id):
+            builder.row(InlineKeyboardButton(text="⚙️ Управление записью", callback_data="menu:booking_admin"))
     return builder.as_markup()
 
 
@@ -309,7 +317,7 @@ async def cmd_help(message: Message):
 async def cb_main_menu(callback: CallbackQuery):
     await callback.message.edit_text(
         _welcome_text_for(callback.from_user.id),
-        reply_markup=mini_app_keyboard(),
+        reply_markup=mini_app_keyboard(callback.from_user.id),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -320,7 +328,7 @@ async def cb_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
         _welcome_text_for(callback.from_user.id),
-        reply_markup=mini_app_keyboard(),
+        reply_markup=mini_app_keyboard(callback.from_user.id),
         parse_mode="HTML",
     )
     await callback.answer()

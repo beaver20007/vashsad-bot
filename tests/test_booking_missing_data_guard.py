@@ -70,8 +70,10 @@ async def test_single_missing_field_does_not_raise(missing_field):
     state.clear.assert_awaited_once()
     message.answer.assert_awaited_once()
     sent_text = message.answer.await_args.args[0]
+    kb = message.answer.await_args.kwargs["reply_markup"]
+    buttons = [b.text for row in kb.inline_keyboard for b in row]
     assert "ошибка" not in sent_text.lower()
-    assert "/book" in sent_text
+    assert any("Начать запись заново" in t for t in buttons)  # кнопка вместо "наберите /book"
 
 
 @pytest.mark.asyncio
@@ -177,9 +179,11 @@ async def test_client_message_is_on_brand_and_actionable():
         await booking.process_contact(message, state, bot)
 
     sent_text = message.answer.await_args.args[0]
+    kb = message.answer.await_args.kwargs["reply_markup"]
+    buttons = [b.text for row in kb.inline_keyboard for b in row]
     for banned in ("ошибка", "error", "exception", "keyerror", "traceback", "null", "none"):
         assert banned not in sent_text.lower(), f"технический/запрещённый термин {banned!r} в тексте клиенту"
-    assert "/book" in sent_text  # понятное действие — что делать дальше
+    assert any("Начать запись заново" in t for t in buttons)  # понятное действие — кнопка, не команда
 
 
 # ── Лог: только имена полей, без значений (имя, телефон, адрес) ────────────
@@ -244,11 +248,15 @@ async def test_missing_phone_text_does_not_log_client_data(caplog):
 
 @pytest.mark.asyncio
 async def test_full_data_still_creates_booking_as_before():
+    """Регресс для track-booking-buttons (2026-10-03): INSERT теперь идёт через
+    fetchval(... RETURNING id) вместо отдельного execute + второго SELECT за
+    booking_id — поведение для клиента то же, внутренний вызов к БД другой."""
     state = _make_state(FULL_DATA)
     message = _make_message(CLIENT_PHONE)
     bot = AsyncMock()
     pool, conn = _mock_pool()
     conn.fetchval = AsyncMock(return_value=99)
+    conn.fetchrow = AsyncMock(return_value={"id": 7})  # слот свободен (проверка перед INSERT)
 
     with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
          patch.object(booking, "build_google_calendar_url", return_value="https://calendar.google.com/x"), \
@@ -256,12 +264,16 @@ async def test_full_data_still_creates_booking_as_before():
          patch("services.scheduler.schedule_booking_reminders", AsyncMock()):
         await booking.process_contact(message, state, bot)
 
-    assert conn.execute.await_count >= 2  # INSERT INTO bookings + UPDATE booking_slots
-    insert_call = conn.execute.await_args_list[0]
+    conn.fetchval.assert_awaited_once()  # INSERT ... RETURNING id
+    insert_call = conn.fetchval.await_args_list[0]
     assert "INSERT INTO bookings" in insert_call.args[0]
     assert insert_call.args[1:] == (
         message.from_user.id, 7, "consultation", "Онлайн-консультация 60 мин", 2500, CLIENT_PHONE,
     )
+
+    conn.execute.assert_awaited_once()  # UPDATE booking_slots SET is_booked=TRUE
+    update_call = conn.execute.await_args_list[0]
+    assert "UPDATE booking_slots" in update_call.args[0]
 
     message.answer.assert_awaited_once()
     confirm_text = message.answer.await_args.args[0]

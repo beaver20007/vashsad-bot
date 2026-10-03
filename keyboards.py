@@ -4,7 +4,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 def main_menu_keyboard() -> InlineKeyboardMarkup:
-    """Главное меню"""
+    """Главное меню.
+    NB (докс-трек Б, 2026-10-03): эта функция нигде не вызывается — реальное
+    главное меню строит handlers.start.mini_app_keyboard(). Оставлена и
+    синхронизирована (добавлена кнопка записи) на случай будущего
+    использования; не трогать без проверки вызывающего кода."""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="🗺 План участка", callback_data="menu:plan"),
@@ -17,6 +21,9 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="💰 Прайс-лист", callback_data="menu:price"),
         InlineKeyboardButton(text="📞 Заказать проект", callback_data="menu:order"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📅 Записаться на консультацию", callback_data="menu:book"),
     )
     return builder.as_markup()
 

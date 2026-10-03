@@ -4,6 +4,7 @@ services/scheduler.py
 """
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import aiohttp
 from aiogram import Bot
@@ -11,10 +12,17 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import DESIGNER_TELEGRAM_ID, DESIGNER_TELEGRAM_ID_2, MINI_APP_URL
+from config import (
+    BOOKING_AUTOSLOTS_ENABLED,
+    DESIGNER_TELEGRAM_ID,
+    DESIGNER_TELEGRAM_ID_2,
+    MINI_APP_URL,
+)
 from services import bot_texts
 from services.database import get_all_user_ids, get_users_with_tasks_due_today
 from services.notifications import send_batch
+
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
 log = logging.getLogger(__name__)
 
@@ -88,15 +96,24 @@ async def notify_garden_tasks(bot: Bot) -> None:
 
 
 async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int, slot_dt: datetime) -> None:
-    """Планирует напоминания за 24ч и 1ч до консультации."""
+    """Планирует напоминания за 24ч и 1ч до консультации.
+
+    slot_dt — наивный datetime, трактуется как московское настенное время
+    (см. handlers/booking.py и docs/ORCHESTRATOR.md, трек часового пояса).
+    "Сейчас" для сравнения берём явно в Europe/Moscow через zoneinfo, а не
+    datetime.now() (контейнер работает в UTC — сравнение с UTC-naive "сейчас"
+    против MSK-naive remind_* было бы рассинхронизировано на 3 часа). Сам
+    run_date тоже передаём с явным timezone=MOSCOW_TZ — не полагаемся на то,
+    что это совпадёт с дефолтным поясом планировщика где-то ещё."""
     remind_24h = slot_dt - timedelta(hours=24)
     remind_1h  = slot_dt - timedelta(hours=1)
-    now = datetime.now()
+    now = datetime.now(MOSCOW_TZ).replace(tzinfo=None)
 
     if remind_24h > now:
         _scheduler_instance.add_job(
             _send_booking_reminder, "date",
             run_date=remind_24h,
+            timezone=MOSCOW_TZ,
             args=[bot, telegram_id, slot_dt, "24h"],
             id=f"booking_remind_24h_{booking_id}",
             replace_existing=True,
@@ -105,6 +122,7 @@ async def schedule_booking_reminders(bot: Bot, telegram_id: int, booking_id: int
         _scheduler_instance.add_job(
             _send_booking_reminder, "date",
             run_date=remind_1h,
+            timezone=MOSCOW_TZ,
             args=[bot, telegram_id, slot_dt, "1h"],
             id=f"booking_remind_1h_{booking_id}",
             replace_existing=True,
@@ -423,6 +441,14 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
         id='self_ping',
         replace_existing=True,
     )
+    if BOOKING_AUTOSLOTS_ENABLED:
+        from handlers.booking import generate_week_slots_job
+        scheduler.add_job(
+            generate_week_slots_job,
+            CronTrigger(day_of_week="mon", hour=0, minute=30, timezone="Europe/Moscow"),
+            id="booking_autoslots_weekly",
+            replace_existing=True,
+        )
     global _scheduler_instance
     _scheduler_instance = scheduler
     log.info("📅 Планировщик настроен (%d сезонных задач + ежедневные уведомления + newsletter_blast)", len(seasonal_items))

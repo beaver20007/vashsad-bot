@@ -1,9 +1,32 @@
 """Конфигурация ВашСад Бот"""
+import json
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _bool_env(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _int_list_env(name: str) -> list[int]:
+    """CSV переменная окружения -> список int, пустая строка -> []. Нечисловые элементы пропускаются."""
+    raw = os.getenv(name, "")
+    out = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            continue
+    return out
 
 # ── Telegram ────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -39,3 +62,66 @@ CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@vashsad_channel")
 
 # ── Sentry ───────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+
+# ── Запись на консультацию (handlers/booking.py) ─────────────────────
+# Контакт для кнопки "Написать" на экране "нет слотов"/"запись скоро откроется".
+# Пусто -> кнопка "Написать" не рисуется (не подставляем выдуманную ссылку).
+BOOKING_CONTACT_URL = os.getenv("BOOKING_CONTACT_URL", "")
+
+# Кто получает уведомление "Новая запись!" и экран "⚙️ Управление записью".
+# Пусто -> по умолчанию оба DESIGNER_TELEGRAM_ID/_2 (как было до этого брифа).
+BOOKING_RECIPIENT_IDS = _int_list_env("BOOKING_RECIPIENT_IDS")
+
+# Пока запись не открыта клиентам — кнопка ведёт на экран-заглушку.
+# Включается только сменой этой переменной (без правки кода).
+BOOKING_OPEN_FOR_CLIENTS = _bool_env("BOOKING_OPEN_FOR_CLIENTS", False)
+
+# Еженедельная автогенерация слотов (services/scheduler.py) — выключена по
+# умолчанию, пока явно не включена.
+BOOKING_AUTOSLOTS_ENABLED = _bool_env("BOOKING_AUTOSLOTS_ENABLED", False)
+
+# Форматы консультаций: (название, ключ, цена ₽, длительность мин).
+# Значения по умолчанию — подтверждены владельцем 03.10.2026, как в коде
+# до этого брифа. Переопределяются через BOOKING_SERVICES_JSON (JSON-массив
+# объектов {"label","key","price","duration_min"}) для будущих правок без
+# деплоя кода; при ошибке разбора/отсутствии переменной — дефолт.
+_BOOKING_SERVICES_DEFAULT = [
+    {"label": "Онлайн-консультация 60 мин", "key": "consultation", "price": 2500, "duration_min": 60},
+    {"label": "Разбор участка по фото",     "key": "photo_review", "price": 1500, "duration_min": 30},
+    {"label": "Стратегия сада",             "key": "strategy",     "price": 3900, "duration_min": 90},
+]
+
+
+def _load_booking_services() -> list[dict]:
+    raw = os.getenv("BOOKING_SERVICES_JSON", "")
+    if not raw.strip():
+        return _BOOKING_SERVICES_DEFAULT
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, list) or not parsed:
+            raise ValueError("BOOKING_SERVICES_JSON должен быть непустым JSON-массивом")
+        for item in parsed:
+            if not all(k in item for k in ("label", "key", "price", "duration_min")):
+                raise ValueError("каждый элемент BOOKING_SERVICES_JSON нуждается в label/key/price/duration_min")
+        return parsed
+    except (ValueError, TypeError) as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "config: BOOKING_SERVICES_JSON некорректен (%s) — использован дефолт", e
+        )
+        return _BOOKING_SERVICES_DEFAULT
+
+
+BOOKING_SERVICES = _load_booking_services()
+
+# Еженедельное расписание автогенерации слотов (дни недели пн=0..вс=6, часы,
+# длительность мин). Переопределяется через BOOKING_AUTOSLOTS_DAYS /
+# BOOKING_AUTOSLOTS_HOURS (CSV) при необходимости; дефолт = текущее ручное
+# расписание (slots:add_week): будни, 10:00 и 14:00.
+BOOKING_AUTOSLOTS_WEEKDAYS = [
+    int(d) for d in os.getenv("BOOKING_AUTOSLOTS_WEEKDAYS", "0,1,2,3,4").split(",") if d.strip().isdigit()
+] or [0, 1, 2, 3, 4]
+BOOKING_AUTOSLOTS_HOURS = [
+    int(h) for h in os.getenv("BOOKING_AUTOSLOTS_HOURS", "10,14").split(",") if h.strip().isdigit()
+] or [10, 14]
+BOOKING_AUTOSLOTS_DURATION_MIN = int(os.getenv("BOOKING_AUTOSLOTS_DURATION_MIN", "60"))
