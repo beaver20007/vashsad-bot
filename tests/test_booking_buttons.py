@@ -163,6 +163,69 @@ async def test_booking_open_for_clients_true_shows_formats():
     state.set_state.assert_awaited_once_with(booking.BookingForm.waiting_service)
 
 
+# ── Предпросмотр для сотрудников при закрытой записи (докс-трек 2026-10-03) ─
+
+@pytest.mark.asyncio
+async def test_staff_sees_format_picker_when_booking_closed():
+    """Сотрудник проходит путь записи даже при BOOKING_OPEN_FOR_CLIENTS=false —
+    нужно, чтобы была возможность проверить сценарий без открытия клиентам."""
+    staff_id = 555
+    message = _make_message(user_id=staff_id)
+    state = _make_state()
+    with patch.object(booking, "BOOKING_OPEN_FOR_CLIENTS", False), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID", staff_id), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID_2", 0), \
+         patch.object(booking, "BOOKING_RECIPIENT_IDS", []):
+        await booking.cmd_book(message, state)
+
+    text = message.answer.await_args.args[0]
+    assert "выберите формат" in text.lower()
+    assert "предпросмотр" in text.lower()
+    state.set_state.assert_awaited_once_with(booking.BookingForm.waiting_service)
+
+
+@pytest.mark.asyncio
+async def test_regular_user_still_sees_coming_soon_when_booking_closed():
+    """Обычный клиент (не из _booking_staff_ids) видит прежний экран-заглушку."""
+    message = _make_message(user_id=100000002)
+    state = _make_state()
+    with patch.object(booking, "BOOKING_OPEN_FOR_CLIENTS", False), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID", 555), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID_2", 0), \
+         patch.object(booking, "BOOKING_RECIPIENT_IDS", []):
+        await booking.cmd_book(message, state)
+
+    text = message.answer.await_args.args[0]
+    assert "скоро откроется" in text.lower()
+    state.clear.assert_awaited_once()
+
+
+def test_zero_designer_id_is_not_considered_staff():
+    """DESIGNER_TELEGRAM_ID_2=0 (дефолт при незаполненной .env) не должен
+    случайно сделать telegram_id=0 сотрудником."""
+    with patch.object(booking, "DESIGNER_TELEGRAM_ID", 555), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID_2", 0), \
+         patch.object(booking, "BOOKING_RECIPIENT_IDS", []):
+        assert booking._is_booking_staff(0) is False
+
+
+@pytest.mark.asyncio
+async def test_staff_preview_not_shown_when_booking_open():
+    """При открытой записи (BOOKING_OPEN_FOR_CLIENTS=true) предпросмотра нет —
+    сотрудник видит обычный экран, как любой клиент."""
+    staff_id = 555
+    message = _make_message(user_id=staff_id)
+    state = _make_state()
+    with patch.object(booking, "BOOKING_OPEN_FOR_CLIENTS", True), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID", staff_id), \
+         patch.object(booking, "DESIGNER_TELEGRAM_ID_2", 0), \
+         patch.object(booking, "BOOKING_RECIPIENT_IDS", []):
+        await booking.cmd_book(message, state)
+
+    text = message.answer.await_args.args[0]
+    assert "предпросмотр" not in text.lower()
+
+
 # ── Права на экран сотрудника ───────────────────────────────────────────
 
 def test_is_booking_staff_designer_ids():
