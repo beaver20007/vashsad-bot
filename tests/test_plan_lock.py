@@ -211,6 +211,74 @@ async def test_two_processes_simulation_redis_layer_catches_what_local_layer_can
                     pytest.fail("не должно сюда дойти — Redis-ключ занят процессом А")
 
 
+# ── Отмена задачи (asyncio.CancelledError) в окне между захватом локального
+#    замка и try/yield — доработка 03.10.2026 (ревью Чата ВашСад): раньше
+#    этот участок был вне try/finally, отмена оставляла замок захваченным
+#    навсегда. ──────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_cancelled_during_redis_set_releases_local_lock_and_dict_entry():
+    """CancelledError на `await client.set(...)` (единственная точка
+    приостановки между acquire() локального замка и `try: yield`) не должна
+    оставлять ни запись в _local_locks, ни захваченный замок."""
+    broken_client = AsyncMock()
+    broken_client.set = AsyncMock(side_effect=asyncio.CancelledError())
+
+    with pytest.raises(asyncio.CancelledError):
+        async with plan_lock.plan_confirm_lock(3001, redis_client=broken_client):
+            pytest.fail("не должно сюда дойти — отмена на client.set")
+
+    assert 3001 not in plan_lock._local_locks
+
+    # Повторный вход (исправный клиент) должен пройти без Busy — подтверждает,
+    # что локальный замок действительно освободился, а не просто "выглядит"
+    # свободным по отсутствию записи в dict.
+    ok_client = _fake_redis()
+    async with plan_lock.plan_confirm_lock(3001, redis_client=ok_client):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_cancelled_inside_block_after_redis_key_acquired_cleans_up_both():
+    """CancelledError внутри тела `async with`, когда Redis-ключ уже
+    захвачен, — ключ должен быть удалён (внутренний finally) и локальный
+    замок освобождён (внешний finally)."""
+    r = _fake_redis()
+    key = "plan_confirm_lock:3002"
+
+    with pytest.raises(asyncio.CancelledError):
+        async with plan_lock.plan_confirm_lock(3002, redis_client=r):
+            assert await r.get(key) is not None  # ключ уже стоит
+            raise asyncio.CancelledError()
+
+    assert await r.get(key) is None  # Redis-ключ снят
+    assert 3002 not in plan_lock._local_locks  # локальный замок освобождён
+
+
+@pytest.mark.asyncio
+async def test_real_task_cancel_during_lock_releases_everything():
+    """Настоящая отмена задачи (asyncio.Task.cancel()), а не искусственно
+    брошенный CancelledError, — замок и Redis-ключ свободны после завершения
+    отменённой задачи."""
+    r = _fake_redis()
+    key = "plan_confirm_lock:3003"
+    started = asyncio.Event()
+
+    async def holder():
+        async with plan_lock.plan_confirm_lock(3003, redis_client=r):
+            started.set()
+            await asyncio.sleep(10)
+
+    task = asyncio.create_task(holder())
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert await r.get(key) is None
+    assert 3003 not in plan_lock._local_locks
+
+
 # ── Константа TTL — зафиксирована, не magic-number на вызове ────────────────
 
 def test_lock_ttl_is_a_short_named_constant():

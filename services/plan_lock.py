@@ -101,59 +101,77 @@ async def plan_confirm_lock(telegram_id: int, redis_client: aioredis.Redis | Non
 
     Поднимает PlanConfirmLockBusy, если занято — вызывающий код должен
     мягко ответить пользователю, не повторяя действие.
+
+    Доработка 03.10.2026 (ревью Чата ВашСад): весь код после захвата
+    локального замка — внутри одного внешнего try/finally, иначе
+    asyncio.CancelledError на `await client.set(...)` (единственная точка
+    приостановки в этом окне — acquire() на свободном локальном замке её не
+    даёт) не ловится `except RedisError` и уходит наружу, оставляя замок
+    захваченным навсегда (до рестарта процесса). Остаточный случай: если
+    отмена приходит ПОСЛЕ того, как Redis физически выполнил SET, но ДО того,
+    как `await client.set(...)` вернул управление в эту функцию — локальная
+    переменная `redis_acquired` не успевает стать True, внешний finally не
+    узнаёт, что ключ нужно удалять, и ключ доживает до истечения TTL (120 с)
+    сам. Осознанно не исправляю это shield()-ом/усложнением — TTL уже
+    ограничивает худший случай сверху.
     """
     local_lock = _local_locks.setdefault(telegram_id, asyncio.Lock())
     if local_lock.locked():
         raise PlanConfirmLockBusy(f"local:{telegram_id}")
     await local_lock.acquire()
 
-    key = f"plan_confirm_lock:{telegram_id}"
-    token = uuid.uuid4().hex
-    client = redis_client if redis_client is not None else _get_redis_client()
+    try:
+        key = f"plan_confirm_lock:{telegram_id}"
+        token = uuid.uuid4().hex
+        client = redis_client if redis_client is not None else _get_redis_client()
 
-    redis_acquired = False
-    if client is None:
-        log.warning(
-            "plan_confirm_lock: REDIS_URL не задан — fail-open на Redis-слое, "
-            "продолжаем под локальным замком",
-        )
-    else:
-        try:
-            redis_acquired = bool(await client.set(key, token, nx=True, ex=PLAN_CONFIRM_LOCK_TTL))
-        except RedisError as e:
+        redis_acquired = False
+        if client is None:
             log.warning(
-                "plan_confirm_lock: Redis недоступен при захвате (%s) — fail-open на Redis-слое, "
+                "plan_confirm_lock: REDIS_URL не задан — fail-open на Redis-слое, "
                 "продолжаем под локальным замком",
-                type(e).__name__,
             )
         else:
-            if not redis_acquired:
-                _local_locks.pop(telegram_id, None)
-                local_lock.release()
-                raise PlanConfirmLockBusy(key)
-
-    try:
-        yield
-    finally:
-        if redis_acquired:
             try:
-                async with client.pipeline(transaction=True) as pipe:
-                    await pipe.watch(key)
-                    current = await pipe.get(key)
-                    if current == token:
-                        pipe.multi()
-                        pipe.delete(key)
-                        await pipe.execute()
-                    else:
-                        await pipe.reset()
+                redis_acquired = bool(await client.set(key, token, nx=True, ex=PLAN_CONFIRM_LOCK_TTL))
             except RedisError as e:
                 log.warning(
-                    "plan_confirm_lock: не удалось снять Redis-блокировку (%s) — истечёт по TTL",
+                    "plan_confirm_lock: Redis недоступен при захвате (%s) — fail-open на Redis-слое, "
+                    "продолжаем под локальным замком",
                     type(e).__name__,
                 )
+            else:
+                if not redis_acquired:
+                    # Внешний finally освобождает локальный замок — здесь
+                    # вручную не трогаем (единая точка освобождения).
+                    raise PlanConfirmLockBusy(key)
+
+        try:
+            yield
+        finally:
+            if redis_acquired:
+                try:
+                    async with client.pipeline(transaction=True) as pipe:
+                        await pipe.watch(key)
+                        current = await pipe.get(key)
+                        if current == token:
+                            pipe.multi()
+                            pipe.delete(key)
+                            await pipe.execute()
+                        else:
+                            await pipe.reset()
+                except RedisError as e:
+                    log.warning(
+                        "plan_confirm_lock: не удалось снять Redis-блокировку (%s) — истечёт по TTL",
+                        type(e).__name__,
+                    )
+    finally:
         # pop + release локального замка — без await между ними (тот же
         # приём, что в старом handlers/plan.py): к моменту, когда другой
         # вызов сделает setdefault и увидит пустой dict, предыдущий владелец
-        # уже гарантированно полностью освободил замок.
+        # уже гарантированно полностью освободил замок. Этот finally
+        # выполняется при ЛЮБОМ выходе из внешнего try — включая
+        # PlanConfirmLockBusy (ветка "Redis занято") и CancelledError в
+        # любой точке ниже acquire().
         _local_locks.pop(telegram_id, None)
         local_lock.release()
