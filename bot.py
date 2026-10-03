@@ -157,6 +157,11 @@ async def main():
     from handlers.booking import create_booking_tables
     await create_booking_tables()
 
+    # Перепланировать напоминания всех будущих confirmed-записей (переживают рестарт бота —
+    # запланированные APScheduler-джобы не сохраняются между процессами).
+    from services.scheduler import reschedule_all_booking_reminders
+    await reschedule_all_booking_reminders(bot)
+
     # Promo таблицы
     from handlers.promo import create_promo_table
     await create_promo_table()

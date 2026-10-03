@@ -455,11 +455,15 @@ class TestBookingPhoneConsent:
     @pytest.mark.asyncio
     async def test_phone_consent_accept_unlocks_contact_state(self):
         """После подтверждения — переход в waiting_contact, только тогда
-        бот готов принять номер телефона."""
+        бот готов принять номер телефона. С track-booking-buttons (2026-10-03)
+        бот ещё и шлёт отдельное сообщение с кнопкой "Поделиться номером"
+        (ReplyKeyboardMarkup с request_contact — её нельзя прикрепить к
+        edit_text, поэтому второе сообщение, не правка первого)."""
         callback = MagicMock()
         callback.answer = AsyncMock()
         callback.message = MagicMock()
         callback.message.edit_text = AsyncMock()
+        callback.message.answer = AsyncMock()
 
         state = AsyncMock()
         state.set_state = AsyncMock()
@@ -468,6 +472,10 @@ class TestBookingPhoneConsent:
         await cb_book_phone_consent(callback, state)
 
         state.set_state.assert_called_once_with(BookingForm.waiting_contact)
+        callback.message.answer.assert_awaited_once()
+        kb = callback.message.answer.await_args.kwargs["reply_markup"]
+        buttons = [b.text for row in kb.keyboard for b in row]
+        assert any("Поделиться номером" in t for t in buttons)
 
 
 # ---------------------------------------------------------------------------

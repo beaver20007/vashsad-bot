@@ -36,6 +36,10 @@ def _make_message(text: str | None, user_id: int = 100000001) -> MagicMock:
 def _mock_pool():
     pool = MagicMock()
     conn = AsyncMock()
+    conn.transaction = MagicMock(return_value=AsyncMock(
+        __aenter__=AsyncMock(return_value=None),
+        __aexit__=AsyncMock(return_value=False),
+    ))
     pool.acquire = MagicMock(return_value=AsyncMock(
         __aenter__=AsyncMock(return_value=conn),
         __aexit__=AsyncMock(return_value=False),
@@ -70,8 +74,10 @@ async def test_single_missing_field_does_not_raise(missing_field):
     state.clear.assert_awaited_once()
     message.answer.assert_awaited_once()
     sent_text = message.answer.await_args.args[0]
+    kb = message.answer.await_args.kwargs["reply_markup"]
+    buttons = [b.text for row in kb.inline_keyboard for b in row]
     assert "ошибка" not in sent_text.lower()
-    assert "/book" in sent_text
+    assert any("Начать запись заново" in t for t in buttons)  # кнопка вместо "наберите /book"
 
 
 @pytest.mark.asyncio
@@ -177,9 +183,11 @@ async def test_client_message_is_on_brand_and_actionable():
         await booking.process_contact(message, state, bot)
 
     sent_text = message.answer.await_args.args[0]
+    kb = message.answer.await_args.kwargs["reply_markup"]
+    buttons = [b.text for row in kb.inline_keyboard for b in row]
     for banned in ("ошибка", "error", "exception", "keyerror", "traceback", "null", "none"):
         assert banned not in sent_text.lower(), f"технический/запрещённый термин {banned!r} в тексте клиенту"
-    assert "/book" in sent_text  # понятное действие — что делать дальше
+    assert any("Начать запись заново" in t for t in buttons)  # понятное действие — кнопка, не команда
 
 
 # ── Лог: только имена полей, без значений (имя, телефон, адрес) ────────────
@@ -244,11 +252,16 @@ async def test_missing_phone_text_does_not_log_client_data(caplog):
 
 @pytest.mark.asyncio
 async def test_full_data_still_creates_booking_as_before():
+    """Регресс для track-booking-buttons (2026-10-03): INSERT теперь идёт через
+    fetchval(... RETURNING id) вместо отдельного execute + второго SELECT за
+    booking_id — поведение для клиента то же, внутренний вызов к БД другой."""
     state = _make_state(FULL_DATA)
     message = _make_message(CLIENT_PHONE)
     bot = AsyncMock()
     pool, conn = _mock_pool()
-    conn.fetchval = AsyncMock(return_value=99)
+    # Слот захватывается атомарным UPDATE ... RETURNING id (conn.fetchval);
+    # id=7 возвращается и на захват слота, и на INSERT ... RETURNING id.
+    conn.fetchval = AsyncMock(return_value=7)
 
     with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
          patch.object(booking, "build_google_calendar_url", return_value="https://calendar.google.com/x"), \
@@ -256,14 +269,18 @@ async def test_full_data_still_creates_booking_as_before():
          patch("services.scheduler.schedule_booking_reminders", AsyncMock()):
         await booking.process_contact(message, state, bot)
 
-    assert conn.execute.await_count >= 2  # INSERT INTO bookings + UPDATE booking_slots
-    insert_call = conn.execute.await_args_list[0]
+    assert conn.fetchval.await_count == 2  # захват слота + INSERT ... RETURNING id
+    claim_call, insert_call = conn.fetchval.await_args_list
+    assert "UPDATE booking_slots" in claim_call.args[0] and "is_booked=FALSE" in claim_call.args[0]
     assert "INSERT INTO bookings" in insert_call.args[0]
     assert insert_call.args[1:] == (
         message.from_user.id, 7, "consultation", "Онлайн-консультация 60 мин", 2500, CLIENT_PHONE,
     )
 
-    message.answer.assert_awaited_once()
-    confirm_text = message.answer.await_args.args[0]
+    conn.execute.assert_not_called()  # захват слота теперь через fetchval, не execute
+
+    # Первое сообщение — "Номер получен" с ReplyKeyboardRemove, второе — подтверждение записи.
+    assert message.answer.await_count == 2
+    confirm_text = message.answer.await_args_list[1].args[0]
     assert "Запись подтверждена" in confirm_text
     state.clear.assert_awaited_once()
