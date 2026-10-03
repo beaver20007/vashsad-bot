@@ -66,3 +66,58 @@ async def test_staff_slots_list_shows_three_distinct_states_without_schema_migra
     icons = [ln[0] for ln in slot_lines]
     assert icons == ["🟢", "🔴", "🔒"], text
     assert "закрыт вручную" in text  # легенда для сотрудника
+
+
+# ── (б) один слот не достаётся двум принимающим одновременно ───────────────
+# Код уже атомарен (conditional UPDATE...RETURNING, не "проверить и
+# записать") — тестов на это в репозитории не было, закрываем хвост.
+
+@pytest.mark.asyncio
+async def test_two_staff_closing_same_slot_only_first_succeeds():
+    """Атомарный conditional UPDATE...RETURNING: второй вызов видит слот уже
+    занятым сразу, а не по итогам отдельной проверки до записи."""
+    pool, conn = _mock_pool()
+    conn.fetchval = AsyncMock(side_effect=[42, None])  # 1-й захватывает, 2-й - уже занято
+
+    cb_a = _make_callback(data="badm_close:42", user_id=111111)  # сотрудник А
+    cb_b = _make_callback(data="badm_close:42", user_id=222222)  # сотрудник Б, тот же слот
+
+    with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
+         patch.object(booking, "_is_booking_staff", return_value=True):
+        await booking.cb_badm_close(cb_a)
+        await booking.cb_badm_close(cb_b)
+
+    assert conn.fetchval.await_count == 2
+    cb_a.answer.assert_awaited_once_with("Слот закрыт", show_alert=True)
+    cb_b.answer.assert_awaited_once_with("Слот уже занят/закрыт", show_alert=True)
+
+
+@pytest.mark.asyncio
+async def test_two_staff_rescheduling_different_bookings_to_same_new_slot_only_first_succeeds():
+    """Два сотрудника переносят ДВЕ РАЗНЫЕ записи на ОДИН И ТОТ ЖЕ новый слот —
+    второй должен получить отказ, а не создать вторую запись на занятый слот."""
+    pool, conn = _mock_pool()
+    old_row = {
+        "telegram_id": 50001, "slot_id": 10, "service_key": "consultation",
+        "service_name": "Консультация", "service_price": 2500, "phone": "+70000000001",
+    }
+    conn.fetchrow = AsyncMock(return_value=old_row)
+    new_dt = datetime(2026, 11, 2, 10, 0)
+    # Порядок fetchval в УСПЕШНОМ прогоне: захват нового слота, SELECT slot_dt,
+    # INSERT...RETURNING id новой записи. Во ВТОРОМ (неуспешном) — только захват.
+    conn.fetchval = AsyncMock(side_effect=[77, new_dt, 999, None])
+
+    bot = AsyncMock()
+    cb_a = _make_callback(data="badm_resched_pick:901:55", user_id=111111)
+    cb_b = _make_callback(data="badm_resched_pick:902:55", user_id=222222)  # тот же new_slot_id=55
+
+    with patch.object(booking, "get_pool", AsyncMock(return_value=pool)), \
+         patch.object(booking, "_is_booking_staff", return_value=True), \
+         patch("services.scheduler.cancel_booking_reminders"), \
+         patch("services.scheduler.schedule_booking_reminders", AsyncMock()):
+        await booking.cb_badm_resched_pick(cb_a, bot)
+        await booking.cb_badm_resched_pick(cb_b, bot)
+
+    cb_a.answer.assert_awaited_once()
+    assert "Перенесено" in cb_a.answer.await_args.args[0]
+    cb_b.answer.assert_awaited_once_with("Этот слот уже занят, выберите другой", show_alert=True)
