@@ -2,13 +2,20 @@
 создавать мусорную запись или показывать текст внутренней ошибки как результат —
 тот же принцип, что уже применён в handlers/plan.py (PR #48), распространён на
 handlers/season_plan.py, chat.py, photo.py, plants.py.
+
+Ниже также — тесты самого ask_claude на сетевом уровне (services/ai.py), трек
+fix/ai-timeout-except (04.10.2026): до фикса `except aiohttp.ClientTimeout` —
+класс НАСТРОЕК, не исключение, при любом исключении внутри try Python падал
+TypeError-ом на этапе сверки с этим except, не доходя даже до `except Exception`.
 """
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 
-from services.ai import ERROR_PREFIXES
+from services import ai as ai_module
+from services.ai import ERROR_PREFIXES, ask_claude
 
 ERROR_TEXTS = [
     "❌ Ошибка AI. Попробуйте позже или нажмите «Заказать проект» для связи с дизайнером.",
@@ -20,6 +27,65 @@ ERROR_TEXTS = [
 
 def test_error_texts_cover_all_prefixes():
     assert all(any(t.startswith(p) for t in ERROR_TEXTS) for p in ERROR_PREFIXES)
+
+
+# ── services/ai.py: ask_claude — перехват исключений сетевого уровня ───────
+# (fix/ai-timeout-except, 04.10.2026)
+
+def _session_cm(post_side_effect=None, status=200, resp_text="", resp_json=None):
+    """Мок для `async with aiohttp.ClientSession() as session, session.post(...) as resp:`.
+    post_side_effect — исключение, которое бросает вход в контекст POST (сетевая
+    ошибка/таймаут); без него — подставляется resp с заданным статусом/телом."""
+    post_cm = MagicMock()
+    if post_side_effect is not None:
+        post_cm.__aenter__ = AsyncMock(side_effect=post_side_effect)
+    else:
+        resp = MagicMock()
+        resp.status = status
+        resp.text = AsyncMock(return_value=resp_text)
+        resp.json = AsyncMock(return_value=resp_json or {"content": [{"text": "ok"}]})
+        post_cm.__aenter__ = AsyncMock(return_value=resp)
+    post_cm.__aexit__ = AsyncMock(return_value=False)
+
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    session.post = MagicMock(return_value=post_cm)
+    return session
+
+
+@pytest.mark.asyncio
+async def test_ask_claude_timeout_returns_the_waiting_message():
+    """Настоящий таймаут (TimeoutError, он же asyncio.TimeoutError с Python
+    3.11; его подкласс — aiohttp.ServerTimeoutError) должен давать "⏳ ...",
+    а не падать TypeError на этапе сверки с except aiohttp.ClientTimeout
+    (поведение до фикса)."""
+    session = _session_cm(post_side_effect=TimeoutError())
+    with patch.object(ai_module, "ANTHROPIC_API_KEY", "test-key"), \
+         patch.object(ai_module.aiohttp, "ClientSession", return_value=session):
+        result = await ask_claude([{"role": "user", "content": "привет"}])
+    assert result == "⏳ Запрос занял слишком много времени. Попробуйте ещё раз."
+
+
+@pytest.mark.asyncio
+async def test_ask_claude_other_network_error_returns_generic_error_message():
+    """aiohttp.ClientError (не таймаут) — другая ветка, общий "❌ Произошла ошибка..."."""
+    session = _session_cm(post_side_effect=aiohttp.ClientConnectionError("boom"))
+    with patch.object(ai_module, "ANTHROPIC_API_KEY", "test-key"), \
+         patch.object(ai_module.aiohttp, "ClientSession", return_value=session):
+        result = await ask_claude([{"role": "user", "content": "привет"}])
+    assert result == "❌ Произошла ошибка. Попробуйте позже."
+
+
+@pytest.mark.asyncio
+async def test_ask_claude_non_200_status_returns_ai_error_message():
+    """Статус не 200 — отдельная ветка без исключения вообще; должна по-прежнему
+    (независимо от фикса except) возвращать "Ошибка AI"."""
+    session = _session_cm(status=500, resp_text="internal error")
+    with patch.object(ai_module, "ANTHROPIC_API_KEY", "test-key"), \
+         patch.object(ai_module.aiohttp, "ClientSession", return_value=session):
+        result = await ask_claude([{"role": "user", "content": "привет"}])
+    assert result == "❌ Ошибка AI. Попробуйте позже или нажмите «Заказать проект» для связи с дизайнером."
 
 
 # ── season_plan.py ────────────────────────────────────────────────────────
