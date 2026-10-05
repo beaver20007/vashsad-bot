@@ -3,6 +3,7 @@ import logging
 import secrets
 import string
 
+import asyncpg
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -141,9 +142,13 @@ async def cmd_new_promo(message: Message):
                 "INSERT INTO promo_codes (code, discount_pct, uses_left) VALUES ($1,$2,$3)",
                 code, discount, uses,
             )
-        except Exception as e:
-            log.warning("newpromo: не удалось вставить код %s: %s", code, e)
+        except asyncpg.exceptions.UniqueViolationError as e:
+            log.warning("newpromo: код %s уже существует: %s", code, e)
             await message.answer(f"❌ Код <code>{code}</code> уже существует.", parse_mode="HTML")
+            return
+        except Exception as e:
+            log.error("newpromo: не удалось вставить код %s: %s", code, e)
+            await message.answer("❌ Не удалось создать код, попробуйте позже.")
             return
 
     await message.answer(

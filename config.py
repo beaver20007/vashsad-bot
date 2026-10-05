@@ -1,10 +1,13 @@
 """Конфигурация ВашСад Бот"""
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+log = logging.getLogger(__name__)
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -15,9 +18,11 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 def _int_list_env(name: str) -> list[int]:
-    """CSV переменная окружения -> список int, пустая строка -> []. Нечисловые элементы пропускаются."""
+    """CSV переменная окружения -> список int, пустая строка -> []. Нечисловые элементы пропускаются
+    (с предупреждением в журнал — опечатка в проде иначе тихо роняет получателя/id без следа)."""
     raw = os.getenv(name, "")
     out = []
+    skipped = 0
     for part in raw.split(","):
         part = part.strip()
         if not part:
@@ -25,7 +30,9 @@ def _int_list_env(name: str) -> list[int]:
         try:
             out.append(int(part))
         except ValueError:
-            continue
+            skipped += 1
+    if skipped:
+        log.warning("_int_list_env(%s): пропущено %d нечисловых элементов", name, skipped)
     return out
 
 # ── Telegram ────────────────────────────────

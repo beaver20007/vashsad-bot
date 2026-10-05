@@ -20,6 +20,7 @@ from handlers.booking import router as booking_router
 from handlers.channel import router as channel_router
 from handlers.chat import router as chat_router  # ← chat ПОСЛЕДНИМ
 from handlers.consent import PdnConsentMiddleware
+from handlers.errors import global_error_handler
 from handlers.export import router as export_router
 from handlers.feedback import router as feedback_router
 from handlers.guide import router as guide_router
@@ -110,6 +111,10 @@ async def main():
     storage = make_fsm_storage(redis)
 
     dp = Dispatcher(storage=storage)
+
+    # Глобальный обработчик необработанных исключений — без него пользователь
+    # не получает вообще никакого ответа при сбое (error-handling-audit.md, п.3).
+    dp.errors.register(global_error_handler)
 
     # Порядок важен! FSM-роутеры ДО chat_router
     # outer: срабатывает до фильтров состояний, иначе анкета PlanForm перехватит команду/кнопку
