@@ -110,6 +110,25 @@ BOOKING_NO_SLOTS_TEXT = (
     "Можно оставить заявку или написать нам напрямую — подберём удобное время вручную."
 )
 
+# B2 (ночной бриф 05→06.10): раньше на отсутствие свободных слотов в окне
+# показывался всегда один и тот же BOOKING_NO_SLOTS_TEXT — независимо от
+# причины (слоты вообще не выставлены / всё занято клиентами / всё закрыто
+# сотрудником). Клиент (или сотрудник в предпросмотре, см. _show_service_picker)
+# не мог отличить «записи пока нет» от «всё разобрано». Тексты — локальные
+# константы файла, как и BOOKING_NO_SLOTS_TEXT/BOOKING_COMING_SOON_TEXT выше
+# (в этом файле тексты бронирования НЕ ходят через content_strings/i18n.t() —
+# держим тот же стиль, не вводим смешанную конвенцию для соседних строк).
+BOOKING_NO_SLOTS_CLOSED_TEXT = (
+    "😔 <b>Свободных слотов пока нет — время временно закрыто</b>\n\n"
+    "Сотрудник временно закрыл эти даты для записи. Можно оставить заявку "
+    "или написать нам напрямую — подберём удобное время вручную."
+)
+
+BOOKING_NO_SLOTS_BOOKED_TEXT = (
+    "😔 <b>Свободных слотов пока нет — всё занято клиентами</b>\n\n"
+    "Можно оставить заявку или написать нам напрямую — подберём удобное время вручную."
+)
+
 
 # ── Доступ сотрудников (позже можно перевести на admin_users) ─────────────
 
@@ -213,6 +232,36 @@ async def _get_free_slots(days_ahead: int = 14) -> list[dict]:
             _moscow_now_naive(), _moscow_now_naive() + timedelta(days=days_ahead),
         )
     return [{"id": r["id"], "dt": r["slot_dt"], "dur": r["duration_min"]} for r in rows]
+
+
+async def _no_free_slots_text(days_ahead: int = 14) -> str:
+    """Какой текст показать клиенту (или сотруднику в предпросмотре), когда
+    _get_free_slots() вернул пусто — различаем "слоты вообще не выставлены"
+    от "всё занято клиентами" от "всё закрыто сотрудником" (та же EXISTS-
+    проверка по bookings.status='confirmed', что в _slot_status_icon/
+    cb_list_slots, здесь — агрегатом по всему окну, не по одному слоту)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT
+                   COUNT(*) FILTER (WHERE is_booked AND has_client_booking) AS booked,
+                   COUNT(*) FILTER (WHERE is_booked AND NOT has_client_booking) AS closed
+               FROM (
+                   SELECT bs.is_booked,
+                          EXISTS(
+                              SELECT 1 FROM bookings b
+                              WHERE b.slot_id = bs.id AND b.status = 'confirmed'
+                          ) AS has_client_booking
+                   FROM booking_slots bs
+                   WHERE bs.slot_dt > $1 AND bs.slot_dt < $2
+               ) x""",
+            _moscow_now_naive(), _moscow_now_naive() + timedelta(days=days_ahead),
+        )
+    if row["booked"] == 0 and row["closed"] == 0:
+        return BOOKING_NO_SLOTS_TEXT
+    if row["booked"] == 0:
+        return BOOKING_NO_SLOTS_CLOSED_TEXT
+    return BOOKING_NO_SLOTS_BOOKED_TEXT
 
 
 def _group_slots_by_day(slots: list[dict]) -> dict[date, list[dict]]:
@@ -327,7 +376,7 @@ async def cb_book_service(callback: CallbackQuery, state: FSMContext):
     slots = await _get_free_slots()
     if not slots:
         await callback.message.edit_text(
-            BOOKING_NO_SLOTS_TEXT, parse_mode="HTML", reply_markup=_booking_coming_soon_keyboard(),
+            await _no_free_slots_text(), parse_mode="HTML", reply_markup=_booking_coming_soon_keyboard(),
         )
         await callback.answer()
         return
@@ -362,7 +411,7 @@ async def cb_book_day_back(callback: CallbackQuery):
     slots = await _get_free_slots()
     if not slots:
         await callback.message.edit_text(
-            BOOKING_NO_SLOTS_TEXT, parse_mode="HTML", reply_markup=_booking_coming_soon_keyboard(),
+            await _no_free_slots_text(), parse_mode="HTML", reply_markup=_booking_coming_soon_keyboard(),
         )
         await callback.answer()
         return
@@ -461,6 +510,10 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
             message.from_user.id, ", ".join(missing),
         )
         await message.answer(BOOKING_RETRY_TEXT, parse_mode="HTML", reply_markup=_booking_restart_keyboard())
+        # Reply-клавиатура "Поделиться номером" не снимается сама при выходе
+        # из анкеты по этой ошибке (та же причина, что ниже при успехе, и в
+        # cb_book_leave_cancel) — явно убираем.
+        await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         await state.clear()
         return
 
@@ -508,6 +561,9 @@ async def process_contact(message: Message, state: FSMContext, bot: Bot):
             parse_mode="HTML",
             reply_markup=_booking_restart_keyboard(),
         )
+        # Та же причина, что в ветке "анкета потеряна" выше — reply-клавиатура
+        # "Поделиться номером" не снимается сама.
+        await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         await state.clear()
         return
 

@@ -115,6 +115,7 @@ async def test_no_slots_screen_shows_contact_button_when_configured():
     callback = _make_callback("book_svc:consultation")
     state = _make_state()
     with patch.object(booking, "_get_free_slots", AsyncMock(return_value=[])), \
+         patch.object(booking, "_no_free_slots_text", AsyncMock(return_value=booking.BOOKING_NO_SLOTS_TEXT)), \
          patch.object(booking, "BOOKING_CONTACT_URL", "https://t.me/vashsad_admin"):
         await booking.cb_book_service(callback, state)
 
@@ -129,6 +130,7 @@ async def test_no_slots_screen_hides_contact_button_when_not_configured():
     callback = _make_callback("book_svc:consultation")
     state = _make_state()
     with patch.object(booking, "_get_free_slots", AsyncMock(return_value=[])), \
+         patch.object(booking, "_no_free_slots_text", AsyncMock(return_value=booking.BOOKING_NO_SLOTS_TEXT)), \
          patch.object(booking, "BOOKING_CONTACT_URL", ""):
         await booking.cb_book_service(callback, state)
 
