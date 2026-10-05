@@ -5,29 +5,21 @@ on:
     branches: [main]
 
 jobs:
-  # Informational: на 21.08.2026 известно 6 преюдиционных сбоев
-  # (handlers.promo._pool, FAQ-регионы), не связанных с содержимым
-  # конкретного PR (см. PR #15, recon-python-lint-ci). Не плодим
-  # вечно-красный статус с первого дня.
-  #
-  # `continue-on-error: true` на job-уровне НЕ красит чек на PR зелёным —
-  # проверено живым прогоном (PR #16): job.conclusion остаётся `failure`,
-  # `gh pr checks` показывает `fail`, хотя весь workflow run отчитывается
-  # как `success`. continue-on-error влияет на статус WORKFLOW RUN (не
-  # блокирует последующие jobs/веб-хуки), а не на статус ЭТОГО чека,
-  # который и виден в интерфейсе PR. Поэтому шаг с pytest сам должен
-  # вернуть 0 — `|| echo`, тот же приём, что теперь в deploy.yml.
+  # Блокирующий с 05.10.2026 (chore/ci-pytest-blocking): на origin/main —
+  # 0 failed (проверено живым прогоном перед правкой), "6 преюдиционных
+  # сбоев" от 21.08.2026 (PR #15/#16) — устаревший факт, тесты, к которым
+  # он относился, давно починены. Раньше `|| echo` на шаге pytest красил
+  # шаг зелёным при любом провале — PR не защищал тестами вообще.
   test:
-    name: pytest (informational)
+    name: pytest
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
-      - run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — известные преюдиционные сбои, см. PR 15 и 16"
+      - run: python -m pytest tests/ --tb=short -q
 
   # Informational, как и test выше: конфиг (pyproject.toml) только что
   # заведён треком chore/t-ruff-setup (2026-08-26), накопленный долг
