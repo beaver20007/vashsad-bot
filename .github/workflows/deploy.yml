@@ -28,6 +28,6 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        # Non-blocking — 6 тестов падают преюдиционно (не связано с main
-        # на момент push), см. PR #15/#16.
-        run: python -m pytest tests/ --tb=short -q || echo "⚠️ Тесты упали (см. лог выше) — известные преюдиционные сбои, см. PR 15 и 16"
+        # Блокирующий с 05.10.2026 — на main 0 failed, "6 преюдиционных
+        # сбоев" от 21.08.2026 (PR #15/#16) устарело, см. ci.yml.
+        run: python -m pytest tests/ --tb=short -q
