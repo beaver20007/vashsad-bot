@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiogram.types import ReplyKeyboardRemove
 
 from handlers import booking
 
@@ -72,12 +73,15 @@ async def test_single_missing_field_does_not_raise(missing_field):
 
     conn.execute.assert_not_called()  # заявка не создана из неполных данных
     state.clear.assert_awaited_once()
-    message.answer.assert_awaited_once()
-    sent_text = message.answer.await_args.args[0]
-    kb = message.answer.await_args.kwargs["reply_markup"]
+    # B2 (ночной бриф 05→06.10): второе сообщение снимает reply-клавиатуру
+    # "Поделиться номером", которая иначе оставалась бы висеть после сброса анкеты.
+    assert message.answer.await_count == 2
+    sent_text = message.answer.await_args_list[0].args[0]
+    kb = message.answer.await_args_list[0].kwargs["reply_markup"]
     buttons = [b.text for row in kb.inline_keyboard for b in row]
     assert "ошибка" not in sent_text.lower()
     assert any("Начать запись заново" in t for t in buttons)  # кнопка вместо "наберите /book"
+    assert isinstance(message.answer.await_args_list[1].kwargs.get("reply_markup"), ReplyKeyboardRemove)
 
 
 @pytest.mark.asyncio
@@ -92,7 +96,7 @@ async def test_several_missing_fields_does_not_raise():
         await booking.process_contact(message, state, bot)
 
     conn.execute.assert_not_called()
-    message.answer.assert_awaited_once()
+    assert message.answer.await_count == 2  # retry-текст + снятие reply-клавиатуры
 
 
 @pytest.mark.asyncio
@@ -107,7 +111,7 @@ async def test_empty_string_field_does_not_raise():
         await booking.process_contact(message, state, bot)
 
     conn.execute.assert_not_called()
-    message.answer.assert_awaited_once()
+    assert message.answer.await_count == 2  # retry-текст + снятие reply-клавиатуры
 
 
 @pytest.mark.asyncio
@@ -122,7 +126,7 @@ async def test_none_field_does_not_raise():
         await booking.process_contact(message, state, bot)
 
     conn.execute.assert_not_called()
-    message.answer.assert_awaited_once()
+    assert message.answer.await_count == 2  # retry-текст + снятие reply-клавиатуры
 
 
 @pytest.mark.asyncio
@@ -164,8 +168,8 @@ async def test_missing_form_field_takes_priority_over_missing_phone():
 
     conn.execute.assert_not_called()
     state.clear.assert_awaited_once()
-    message.answer.assert_awaited_once()
-    sent_text = message.answer.await_args.args[0]
+    assert message.answer.await_count == 2  # retry-текст + снятие reply-клавиатуры
+    sent_text = message.answer.await_args_list[0].args[0]
     assert sent_text == booking.BOOKING_RETRY_TEXT
     assert "номер телефона" not in sent_text.lower()
 
@@ -182,8 +186,8 @@ async def test_client_message_is_on_brand_and_actionable():
     with patch.object(booking, "get_pool", AsyncMock(return_value=pool)):
         await booking.process_contact(message, state, bot)
 
-    sent_text = message.answer.await_args.args[0]
-    kb = message.answer.await_args.kwargs["reply_markup"]
+    sent_text = message.answer.await_args_list[0].args[0]
+    kb = message.answer.await_args_list[0].kwargs["reply_markup"]
     buttons = [b.text for row in kb.inline_keyboard for b in row]
     for banned in ("ошибка", "error", "exception", "keyerror", "traceback", "null", "none"):
         assert banned not in sent_text.lower(), f"технический/запрещённый термин {banned!r} в тексте клиенту"

@@ -271,7 +271,10 @@ async def test_double_booking_same_slot_second_attempt_rejected():
         await booking.process_contact(message, state, bot)
 
     conn.fetchval.assert_awaited_once()  # только попытка захвата, INSERT не дошёл
-    sent_text = message.answer.await_args.args[0]
+    # B2 (ночной бриф 05→06.10): второе сообщение снимает reply-клавиатуру
+    # "Поделиться номером".
+    assert message.answer.await_count == 2
+    sent_text = message.answer.await_args_list[0].args[0]
     assert "уже заняли" in sent_text.lower()
     state.clear.assert_awaited_once()
 
