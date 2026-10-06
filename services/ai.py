@@ -58,7 +58,14 @@ async def ask_claude(messages: list, system: str = None) -> str:
             data = await resp.json()
             return data["content"][0]["text"]
 
-    except aiohttp.ClientTimeout:
+    except TimeoutError:
+        # aiohttp.ServerTimeoutError наследуется от TimeoutError (он же —
+        # asyncio.TimeoutError, с Python 3.11 это один и тот же класс) —
+        # перехватывается тоже. aiohttp.ClientTimeout (прежний except) — это
+        # класс НАСТРОЕК (передаётся в timeout=...), не исключение: при любом
+        # исключении внутри try Python падал с TypeError ("catching classes
+        # that do not inherit from BaseException is not allowed") на этапе
+        # сверки с этим except, не доходя даже до `except Exception` ниже.
         return "⏳ Запрос занял слишком много времени. Попробуйте ещё раз."
     except Exception as e:
         log.error(f"Claude API exception: {e}")
