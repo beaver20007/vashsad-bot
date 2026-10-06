@@ -21,7 +21,7 @@ def is_error_response(text: str) -> bool:
     return text.startswith(ERROR_PREFIXES)
 
 
-async def ask_claude(messages: list, system: str = None) -> str:
+async def ask_claude(messages: list, system: str = None, max_tokens: int = ANTHROPIC_MAX_TOKENS) -> str:
     """Отправить запрос к Claude API и получить ответ"""
     if not ANTHROPIC_API_KEY:
         return (
@@ -38,7 +38,7 @@ async def ask_claude(messages: list, system: str = None) -> str:
 
     payload = {
         "model": ANTHROPIC_MODEL,
-        "max_tokens": ANTHROPIC_MAX_TOKENS,
+        "max_tokens": max_tokens,
         "system": system or bot_texts.get("system_prompt.chat")["text"],
         "messages": messages,
     }
