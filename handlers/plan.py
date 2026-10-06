@@ -1,5 +1,4 @@
 """Хендлер генерации плана участка — пошаговый FSM"""
-import asyncio
 import logging
 
 from aiogram import F, Router
@@ -16,6 +15,7 @@ from services.ai import ask_claude
 from services.content_texts import get_designer_qualification_line
 from services.database import get_or_create_user, save_order
 from services.pdf_generator import generate_plan_pdf
+from services.plan_lock import PlanConfirmLockBusy, plan_confirm_lock
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -24,13 +24,9 @@ log = logging.getLogger(__name__)
 # текст ошибки одной из этих строк (см. season_plan.py:106, тот же принцип).
 ASK_CLAUDE_ERROR_PREFIXES = ("❌", "⏳", "⚠️")
 
-# Защита от двойного тапа "Подтвердить": апдейты идут параллельными задачами
-# (Dispatcher без events_isolation), фильтр по waiting_confirm читает состояние
-# ДО хендлера — оба тапа проходят фильтр, если пришли почти одновременно.
-# Мьютекс на telegram_id сериализует обработку внутри одного процесса бота
-# (проверка/вход в `async with lock` — без await между ними, поэтому атомарна
-# для однопоточного event loop).
-_plan_confirm_locks: dict[int, asyncio.Lock] = {}
+# Второй тап "Подтвердить", пока первый ещё обрабатывается, — не ошибка,
+# просьба подождать; действие не дублируется (см. services/plan_lock.py).
+PLAN_CONFIRM_BUSY_TEXT = "⏳ Уже обрабатывается, подождите…"
 
 
 class PlanForm(StatesGroup):
@@ -216,16 +212,14 @@ async def plan_restart(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "plan:confirm", PlanForm.waiting_confirm)
 async def plan_generate(callback: CallbackQuery, state: FSMContext):
     telegram_id = callback.from_user.id
-    lock = _plan_confirm_locks.setdefault(telegram_id, asyncio.Lock())
-    if lock.locked():
-        # Второй параллельный тап того же plan:confirm — уже обрабатывается.
-        await callback.answer()
-        return
-    async with lock:
-        try:
+    try:
+        async with plan_confirm_lock(telegram_id):
             await _plan_generate(callback, state)
-        finally:
-            _plan_confirm_locks.pop(telegram_id, None)
+    except PlanConfirmLockBusy:
+        # Второй параллельный тап того же plan:confirm — уже обрабатывается
+        # (возможно, в другом процессе бота — блокировка в Redis, не в памяти
+        # процесса). Действие не дублируем, пользователю — мягкий ответ.
+        await callback.answer(PLAN_CONFIRM_BUSY_TEXT, show_alert=False)
 
 
 async def _plan_generate(callback: CallbackQuery, state: FSMContext):
