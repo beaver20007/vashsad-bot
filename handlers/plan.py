@@ -279,7 +279,8 @@ async def _plan_generate(callback: CallbackQuery, state: FSMContext):
         log.error("plan_generate: ask_claude вернул ошибку для user %s: %r", callback.from_user.id, result)
         try:
             await callback.message.edit_text(i18n.t("error_generic"))
-        except Exception:
+        except Exception as e:
+            log.warning("plan_generate: edit_text упал (%s), fallback на answer", type(e).__name__)
             await callback.message.answer(i18n.t("error_generic"))
         return
 

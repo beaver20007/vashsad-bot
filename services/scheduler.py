@@ -184,7 +184,7 @@ async def _send_booking_reminder(bot: Bot, booking_id: int, scheduled_slot_dt: d
     try:
         await bot.send_message(row["telegram_id"], text, parse_mode="HTML")
     except TelegramForbiddenError:
-        pass
+        log.info("Reminder: пользователь заблокировал бота, booking #%s не доставлено", booking_id)
     except Exception as e:
         log.warning("Reminder error for booking #%s: %s", booking_id, e)
 
