@@ -241,7 +241,12 @@ def generate_guide_pdf(
     designer_name: str = DESIGNER_NAME,
     qualification_line: str = DEFAULT_QUALIFICATION_LINE,
 ) -> bytes:
-    """Генерирует PDF-гайд и возвращает байты."""
+    """Генерирует PDF-гайд и возвращает байты.
+
+    Бросает PdfFontError, если шрифт с кириллицей недоступен (см. _ensure_fonts).
+    """
+    _ensure_fonts()
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -254,45 +259,45 @@ def generate_guide_pdf(
     title_style = ParagraphStyle(
         "Title", parent=styles["Normal"],
         fontSize=22, textColor=SAGE, alignment=TA_CENTER,
-        spaceAfter=4, fontName="Helvetica-Bold",
+        spaceAfter=4, fontName=PDF_FONT_BOLD,
     )
     subtitle_style = ParagraphStyle(
         "Sub", parent=styles["Normal"],
         fontSize=12, textColor=EARTH, alignment=TA_CENTER,
-        spaceAfter=2,
+        spaceAfter=2, fontName=PDF_FONT,
     )
     author_style = ParagraphStyle(
         "Author", parent=styles["Normal"],
         fontSize=10, textColor=DARK, alignment=TA_CENTER,
-        spaceAfter=16,
+        spaceAfter=16, fontName=PDF_FONT,
     )
     section_style = ParagraphStyle(
         "Section", parent=styles["Normal"],
-        fontSize=14, textColor=SAGE, fontName="Helvetica-Bold",
+        fontSize=14, textColor=SAGE, fontName=PDF_FONT_BOLD,
         spaceBefore=12, spaceAfter=6,
     )
     plant_name_style = ParagraphStyle(
         "PlantName", parent=styles["Normal"],
-        fontSize=11, textColor=DARK, fontName="Helvetica-Bold",
+        fontSize=11, textColor=DARK, fontName=PDF_FONT_BOLD,
     )
     plant_latin_style = ParagraphStyle(
         "PlantLatin", parent=styles["Normal"],
-        fontSize=9, textColor=EARTH, fontName="Helvetica-Oblique",
+        fontSize=9, textColor=EARTH, fontName=PDF_FONT,
     )
     body_style = ParagraphStyle(
         "Body", parent=styles["Normal"],
-        fontSize=9, textColor=DARK, leading=13,
+        fontSize=9, textColor=DARK, leading=13, fontName=PDF_FONT,
     )
     footer_style = ParagraphStyle(
         "Footer", parent=styles["Normal"],
-        fontSize=8, textColor=EARTH, alignment=TA_CENTER,
+        fontSize=8, textColor=EARTH, alignment=TA_CENTER, fontName=PDF_FONT,
     )
 
     story = []
 
-    # ── Обложка ──
+    # ── Обложка ── (эмодзи убираем — DejaVu Sans их не содержит, см. _clean)
     story.append(Spacer(1, 1*cm))
-    story.append(Paragraph("🌿 ВашСад", title_style))
+    story.append(Paragraph(_clean("🌿 ВашСад"), title_style))
     story.append(Paragraph("15 растений для природного сада", subtitle_style))
     story.append(Paragraph("Нижегородская и Владимирская области", subtitle_style))
     story.append(Spacer(1, 0.5*cm))
@@ -362,8 +367,13 @@ def generate_guide_pdf(
 
 
 def generate_clients_pdf(clients_data: list, designer_name: str = DESIGNER_NAME) -> bytes:
-    """Генерирует PDF со списком клиентов (уникальные по telegram_id из orders)."""
+    """Генерирует PDF со списком клиентов (уникальные по telegram_id из orders).
+
+    Бросает PdfFontError, если шрифт с кириллицей недоступен (см. _ensure_fonts).
+    """
     from datetime import date
+
+    _ensure_fonts()
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -378,21 +388,21 @@ def generate_clients_pdf(clients_data: list, designer_name: str = DESIGNER_NAME)
     cover_title_style = ParagraphStyle(
         "ClientsCoverTitle", parent=styles["Normal"],
         fontSize=24, textColor=SAGE, alignment=TA_CENTER,
-        fontName="Helvetica-Bold", spaceAfter=6,
+        fontName=PDF_FONT_BOLD, spaceAfter=6,
     )
     cover_sub_style = ParagraphStyle(
         "ClientsCoverSub", parent=styles["Normal"],
         fontSize=11, textColor=EARTH, alignment=TA_CENTER,
-        spaceAfter=4,
+        spaceAfter=4, fontName=PDF_FONT,
     )
     footer_style = ParagraphStyle(
         "ClientsFooter", parent=styles["Normal"],
         fontSize=8, textColor=EARTH, alignment=TA_CENTER,
-        spaceBefore=12,
+        spaceBefore=12, fontName=PDF_FONT,
     )
     cell_style = ParagraphStyle(
         "ClientsCell", parent=styles["Normal"],
-        fontSize=7, leading=9,
+        fontSize=7, leading=9, fontName=PDF_FONT,
     )
 
     STATUS_RU = {
@@ -418,7 +428,7 @@ def generate_clients_pdf(clients_data: list, designer_name: str = DESIGNER_NAME)
     story.append(Spacer(1, 0.5*cm))
 
     if not clients_data:
-        story.append(Paragraph("Клиентов пока нет.", styles["Normal"]))
+        story.append(Paragraph("Клиентов пока нет.", cover_sub_style))
     else:
         headers = ["№", "Имя", "Телефон", "Услуга", "Регион", "Статус", "Дата"]
         data = [headers]
@@ -442,7 +452,8 @@ def generate_clients_pdf(clients_data: list, designer_name: str = DESIGNER_NAME)
         tbl.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, 0), SAGE),
             ("TEXTCOLOR",     (0, 0), (-1, 0), white),
-            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME",      (0, 0), (-1, 0), PDF_FONT_BOLD),
+            ("FONTNAME",      (0, 1), (-1, -1), PDF_FONT),
             ("FONTSIZE",      (0, 0), (-1, 0), 8),
             ("FONTSIZE",      (0, 1), (-1, -1), 7),
             ("ROWBACKGROUNDS",(0, 1), (-1, -1), [white, CREAM]),
